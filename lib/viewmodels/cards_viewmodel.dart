@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../models/card.dart';
 import '../models/filter_state.dart';
@@ -32,6 +33,8 @@ class CardsViewModel extends ChangeNotifier {
   bool _filterOpen = false;
   FilterState _fs = const FilterState();
   int _playToken = 0;
+  int? _pausedIndex;
+  bool _pausedInDelay = false;
   StreamSubscription<List<TranslationCard>>? _sub;
 
   CardsViewModel({
@@ -55,6 +58,7 @@ class CardsViewModel extends ChangeNotifier {
   int? get speakingId => _speakingId;
   int? get currentId => _currentId;
   bool get listPlaying => _listPlaying;
+  bool get isPaused => _pausedIndex != null;
   bool get filterOpen => _filterOpen;
   FilterState get filterState => _fs;
   Stream<String> get errors => _repository.errors;
@@ -101,6 +105,9 @@ class CardsViewModel extends ChangeNotifier {
   }
 
   void updateFilterState(FilterState fs) {
+    if (fs.sort != _fs.sort || fs.filter != _fs.filter) {
+      _pausedIndex = null;
+    }
     _fs = fs;
     notifyListeners();
   }
@@ -136,12 +143,15 @@ class CardsViewModel extends ChangeNotifier {
       return;
     }
     if (translation.audioData == null) return;
+    _stopAllInternal();
     _playToken++;
     final token = _playToken;
-    _listPlaying = false;
-    _currentId = null;
     _speakingId = card.id;
     _repository.bumpPlays(card);
+    final list = view;
+    final idx = list.indexWhere((c) => c.id == card.id);
+    _pausedIndex = idx >= 0 ? idx : null;
+    _pausedInDelay = false;
     notifyListeners();
     _playAndWait(token, translation.audioData!, () {
       if (_playToken == token) {
@@ -153,18 +163,44 @@ class CardsViewModel extends ChangeNotifier {
 
   void toggleListPlayback() {
     if (_listPlaying) {
-      _stopAll();
+      _pausedIndex = _currentIndex();
+      _pausedInDelay = _speakingId == null;
+      _stopAllInternal();
       return;
     }
+    _resumeListPlayback();
+  }
+
+  void resetAndPlay() {
+    _pausedIndex = null;
+    _resumeListPlayback();
+  }
+
+  void _resumeListPlayback() {
     final v = view;
     if (v.isEmpty) return;
+    _stopAllInternal();
     _playToken++;
     final token = _playToken;
     _listPlaying = true;
     _filterOpen = false;
     _expandedId = null;
+
+    int startIdx;
+    if (_pausedIndex != null) {
+      startIdx = _pausedInDelay ? _pausedIndex! + 1 : _pausedIndex!;
+    } else {
+      startIdx = 0;
+    }
+    _pausedIndex = null;
     notifyListeners();
-    _playStep(0, token);
+    _playStep(startIdx, token);
+  }
+
+  int? _currentIndex() {
+    final v = view;
+    final idx = v.indexWhere((c) => c.id == (_currentId ?? _speakingId));
+    return idx >= 0 ? idx : null;
   }
 
   void _playStep(int i, int token) {
@@ -199,10 +235,8 @@ class CardsViewModel extends ChangeNotifier {
     notifyListeners();
     _playAndWait(token, t.audioData!, () {
       if (_playToken != token) return;
-      // Clip ended — clear play icon but keep outline
       _speakingId = null;
       notifyListeners();
-      // Wait for shadow delay
       final delayMs = _shadowDelayMs(card, t);
       Future.delayed(Duration(milliseconds: delayMs), () {
         if (_playToken != token) return;
@@ -234,6 +268,11 @@ class CardsViewModel extends ChangeNotifier {
   }
 
   void _stopAll() {
+    _pausedIndex = null;
+    _stopAllInternal();
+  }
+
+  void _stopAllInternal() {
     _playToken++;
     _completeSub?.cancel();
     _audio.stop();

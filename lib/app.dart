@@ -131,12 +131,14 @@ class _LingoAppState extends State<LingoApp> {
                       open: cardsVm.filterOpen,
                       setOpen: cardsVm.setFilterOpen,
                     ),
-                    PlayFAB(
-                      playing: cardsVm.listPlaying,
-                      onTap: cardsVm.toggleListPlayback,
-                      index: max(0, cardsVm.currentPlayIndex),
-                      total: view.length,
-                    ),
+                  PlayFAB(
+                    playing: cardsVm.listPlaying,
+                    isPaused: cardsVm.isPaused,
+                    onTap: cardsVm.toggleListPlayback,
+                    onReset: cardsVm.resetAndPlay,
+                    index: max(0, cardsVm.currentPlayIndex),
+                    total: view.length,
+                  ),
                   ],
                   if (_page == 'settings')
                     SettingsPage(

@@ -34,7 +34,7 @@ class _LingoAppRootState extends State<LingoAppRoot> {
   }
 
   Future<void> _init() async {
-    await DatabaseService.database; // ensure DB is created
+    await DatabaseService.database;
     _cardRepo = CardRepository(api: ApiService());
     _settingsRepo = SettingsRepository();
     _cardsVm = CardsViewModel(repository: _cardRepo, settings: _settingsRepo);
