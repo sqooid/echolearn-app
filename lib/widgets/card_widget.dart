@@ -108,14 +108,12 @@ class MetaRow extends StatelessWidget {
   final Widget icon;
   final String label;
   final String value;
-  final bool mono;
 
   const MetaRow({
     super.key,
     required this.icon,
     required this.label,
     required this.value,
-    this.mono = false,
   });
 
   @override
@@ -125,26 +123,14 @@ class MetaRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: icon,
-          ),
+          SizedBox(width: 16, height: 16, child: icon),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(fontSize: 13, color: theme.colors.inkSoft),
-          ),
+          Text(label, style: TextStyle(fontSize: 13, color: theme.colors.inkSoft)),
           const Spacer(),
           Flexible(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colors.ink,
-                fontWeight: FontWeight.w500,
-                fontFamily: mono ? 'monospace' : null,
-              ),
+              style: TextStyle(fontSize: 13, color: theme.colors.ink, fontWeight: FontWeight.w500),
               textAlign: TextAlign.right,
             ),
           ),
@@ -182,42 +168,36 @@ class _ActionBtnState extends State<ActionBtn> {
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
-    return Expanded(
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onTapDown: (_) => _setHover(true),
-        onTapUp: (_) => _setHover(false),
-        onTapCancel: () => _setHover(false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: const Cubic(0.32, 0.72, 0, 1),
-          height: 44,
-          decoration: BoxDecoration(
-            color: _hover
-                ? (widget.danger ? theme.colors.ink : theme.colors.surface3)
-                : theme.colors.surface2,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.colors.borderStrong),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 17,
-                height: 17,
-                child: widget.icon,
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => _setHover(true),
+      onTapUp: (_) => _setHover(false),
+      onTapCancel: () => _setHover(false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: const Cubic(0.32, 0.72, 0, 1),
+        height: 44,
+        decoration: BoxDecoration(
+          color: _hover
+              ? (widget.danger ? theme.colors.ink : theme.colors.surface3)
+              : theme.colors.surface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.colors.borderStrong),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(width: 17, height: 17, child: widget.icon),
+            const SizedBox(width: 8),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: _hover && widget.danger ? theme.colors.surface : theme.colors.ink,
               ),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _hover && widget.danger ? theme.colors.surface : theme.colors.ink,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -226,6 +206,7 @@ class _ActionBtnState extends State<ActionBtn> {
 
 class TranslationCardWidget extends StatelessWidget {
   final TranslationCard card;
+  final TranslationEntry? translation;
   final bool expanded;
   final bool current;
   final bool playing;
@@ -238,6 +219,7 @@ class TranslationCardWidget extends StatelessWidget {
   const TranslationCardWidget({
     super.key,
     required this.card,
+    required this.translation,
     required this.expanded,
     required this.current,
     required this.playing,
@@ -252,10 +234,10 @@ class TranslationCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
     final pad = 18.0 * theme.density;
-    final isProcessing = card.status == CardStatus.processing;
+    final isTranslating = translation == null;
 
     return GestureDetector(
-      onTap: isProcessing ? null : () => onToggle(),
+      onTap: isTranslating ? null : () => onToggle(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: const Cubic(0.32, 0.72, 0, 1),
@@ -271,38 +253,24 @@ class TranslationCardWidget extends StatelessWidget {
               ? [
                   BoxShadow(color: theme.accent, blurRadius: 0, spreadRadius: 1),
                   BoxShadow(color: theme.accent, blurRadius: 0, spreadRadius: 1),
-                  const BoxShadow(
-                    color: Color(0x1A000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 4),
-                    spreadRadius: 0,
-                  ),
+                  const BoxShadow(color: Color(0x1A000000), blurRadius: 16, offset: Offset(0, 4)),
                 ]
               : [
-                  const BoxShadow(
-                    color: Color(0x0F000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                    spreadRadius: 0,
-                  ),
-                  const BoxShadow(
-                    color: Color(0x0A000000),
-                    blurRadius: 1,
-                    offset: Offset(0, 1),
-                  ),
+                  const BoxShadow(color: Color(0x0F000000), blurRadius: 2, offset: Offset(0, 1)),
+                  const BoxShadow(color: Color(0x0A000000), blurRadius: 1, offset: Offset(0, 1)),
                 ],
         ),
         child: AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: const Cubic(0.32, 0.72, 0, 1),
           alignment: Alignment.topCenter,
-          child: isProcessing ? _buildProcessing(theme) : _buildContent(theme),
+          child: isTranslating ? _buildTranslating(theme) : _buildContent(theme),
         ),
       ),
     );
   }
 
-  Widget _buildProcessing(LingoTheme theme) {
+  Widget _buildTranslating(LingoTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,11 +280,7 @@ class TranslationCardWidget extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           card.en,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.45,
-            color: theme.colors.inkSoft,
-          ),
+          style: TextStyle(fontSize: 14, height: 1.45, color: theme.colors.inkSoft),
         ),
         const SizedBox(height: 10),
         Row(
@@ -339,6 +303,7 @@ class TranslationCardWidget extends StatelessWidget {
   }
 
   Widget _buildContent(LingoTheme theme) {
+    final hasAudio = translation?.audioData != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -350,29 +315,23 @@ class TranslationCardWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    card.jp,
+                    translation?.text ?? '',
                     style: TextStyle(
-                      fontSize: 25,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                      color: theme.colors.ink,
-                      letterSpacing: 0.01,
+                      fontSize: 25, height: 1.4, fontWeight: FontWeight.w500,
+                      color: theme.colors.ink, letterSpacing: 0.01,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     card.en,
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.45,
-                      color: theme.colors.inkSoft,
-                    ),
+                    style: TextStyle(fontSize: 14, height: 1.45, color: theme.colors.inkSoft),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 14),
-            PlayDOT(playing: playing, onTap: () => onPlay()),
+            if (hasAudio)
+              PlayDOT(playing: playing, onTap: onPlay),
           ],
         ),
         if (card.archived && !expanded)
@@ -425,12 +384,6 @@ class TranslationCardWidget extends StatelessWidget {
         Divider(height: 1, thickness: 1, color: theme.colors.border),
         const SizedBox(height: 6),
         MetaRow(
-          icon: IconType(size: 16, color: theme.colors.inkFaint),
-          label: 'Reading',
-          value: card.romaji,
-          mono: true,
-        ),
-        MetaRow(
           icon: IconClock(size: 16, color: theme.colors.inkFaint),
           label: 'Created',
           value: fullTime(card.createdAt),
@@ -443,24 +396,27 @@ class TranslationCardWidget extends StatelessWidget {
         const SizedBox(height: 14),
         Row(
           children: [
-            if (card.archived)
-              ActionBtn(
-                icon: IconRestore(size: 17, color: theme.colors.ink),
-                label: 'Restore',
-                onTap: () => onRestore(),
-              )
-            else
-              ActionBtn(
-                icon: IconArchive(size: 17, color: theme.colors.ink),
-                label: 'Archive',
-                onTap: () => onArchive(),
-              ),
+            Expanded(
+              child: card.archived
+                  ? ActionBtn(
+                      icon: IconRestore(size: 17, color: theme.colors.ink),
+                      label: 'Restore',
+                      onTap: onRestore,
+                    )
+                  : ActionBtn(
+                      icon: IconArchive(size: 17, color: theme.colors.ink),
+                      label: 'Archive',
+                      onTap: onArchive,
+                    ),
+            ),
             const SizedBox(width: 10),
-            ActionBtn(
-              icon: IconTrash(size: 17, color: theme.colors.ink),
-              label: 'Delete',
-              danger: true,
-              onTap: () => onDelete(),
+            Expanded(
+              child: ActionBtn(
+                icon: IconTrash(size: 17, color: theme.colors.ink),
+                label: 'Delete',
+                danger: true,
+                onTap: onDelete,
+              ),
             ),
           ],
         ),

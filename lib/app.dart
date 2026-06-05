@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'models/card.dart';
-import 'models/settings.dart';
-import 'models/filter_state.dart';
-import 'data/cards.dart';
+import 'package:provider/provider.dart';
 import 'utils/theme.dart';
+import 'viewmodels/cards_viewmodel.dart';
+import 'viewmodels/settings_viewmodel.dart';
 import 'widgets/bottom_bar.dart';
 import 'widgets/filter_bar.dart';
 import 'widgets/play_fab.dart';
@@ -20,85 +20,22 @@ class LingoApp extends StatefulWidget {
 }
 
 class _LingoAppState extends State<LingoApp> {
-  AppSettings _settings = const AppSettings();
-  List<TranslationCard> _cards = [];
-  String _page = 'main';
   bool _dictating = false;
-  String? _expandedId;
-  String? _speakingId;
-  String? _currentId;
-  bool _listPlaying = false;
-  bool _filterOpen = false;
-  FilterState _fs = const FilterState();
-
+  String _page = 'main';
   final ScrollController _scrollController = ScrollController();
-  int _playToken = 0;
-
+  StreamSubscription<String>? _errorSub;
   static const double _kItemEstimate = 160;
 
   @override
-  void initState() {
-    super.initState();
-    _cards = generateCards(count: 520);
-  }
-
-  @override
   void dispose() {
+    _errorSub?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
-  List<TranslationCard> get _view {
-    var v = _cards.where((c) {
-      if (_fs.filter == 'all') return true;
-      if (_fs.filter == 'archived') return c.archived;
-      return !c.archived;
-    }).toList();
-
-    if (_fs.query.trim().isNotEmpty) {
-      final q = _fs.query.trim().toLowerCase();
-      v = v.where((c) =>
-          c.en.toLowerCase().contains(q) ||
-          c.jp.contains(_fs.query.trim()) ||
-          c.romaji.toLowerCase().contains(q)).toList();
-    }
-
-    if (_fs.sort == 'shuffle' && _fs.shuffledIds != null) {
-      final pos = <String, int>{};
-      for (var i = 0; i < _fs.shuffledIds!.length; i++) {
-        pos[_fs.shuffledIds![i]] = i;
-      }
-      v.sort((a, b) => (pos[a.id] ?? 1e9).compareTo(pos[b.id] ?? 1e9));
-    } else if (_fs.sort == 'newest') {
-      v.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } else if (_fs.sort == 'oldest') {
-      v.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    } else if (_fs.sort == 'az') {
-      v.sort((a, b) => a.en.compareTo(b.en));
-    } else if (_fs.sort == 'za') {
-      v.sort((a, b) => b.en.compareTo(a.en));
-    }
-
-    return v;
-  }
-
-  void _bumpPlays(String id) {
-    setState(() {
-      _cards = _cards.map((c) => c.id == id ? c.copyWith(plays: c.plays + 1) : c).toList();
-    });
-  }
-
-  void _stopAll() {
-    _playToken++;
-    setState(() {
-      _listPlaying = false;
-      _speakingId = null;
-      _currentId = null;
-    });
-  }
-
   void _scrollToIndex(int index, {String align = 'start'}) {
-    final gap = gapPixels(_settings.spacing);
+    final settings = context.read<SettingsViewModel>().settings;
+    final gap = gapPixels(settings.spacing);
     var offset = index * (_kItemEstimate + gap);
     if (align == 'center') {
       final viewport = _scrollController.position.viewportDimension;
@@ -112,175 +49,19 @@ class _LingoAppState extends State<LingoApp> {
     );
   }
 
-  Future<void> _speak(String text, {int minDur = 1700}) async {
-    final duration = max(minDur, text.length * 150);
-    await Future.delayed(Duration(milliseconds: duration));
-  }
-
-  void _playStep(int i, int token) {
-    if (_playToken != token) return;
-    final list = _view;
-    if (i >= list.length) {
-      if (_fs.reshuffle && list.isNotEmpty) {
-        final ids = shuffleList(list.map((c) => c.id).toList());
-        setState(() => _fs = _fs.copyWith(sort: 'shuffle', shuffledIds: ids));
-        Future.delayed(const Duration(milliseconds: 160), () {
-          if (_playToken == token) {
-          _scrollToIndex(0);
-          _playStep(0, token);
-          }
-        });
-        return;
-      }
-      _stopAll();
-      return;
-    }
-    final card = list[i];
-    setState(() {
-      _speakingId = card.id;
-      _currentId = card.id;
-    });
-    _bumpPlays(card.id);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToIndex(i, align: 'center');
-    });
-    _speak(card.jp).then((_) {
-      if (_playToken == token) _playStep(i + 1, token);
-    });
-  }
-
-  void _toggleListPlayback() {
-    if (_listPlaying) {
-      _stopAll();
-      return;
-    }
-    final view = _view;
-    if (view.isEmpty) return;
-    _playToken++;
-    final token = _playToken;
-    setState(() {
-      _listPlaying = true;
-      _filterOpen = false;
-      _expandedId = null;
-    });
-    _playStep(0, token);
-  }
-
-  void _playOne(TranslationCard card) {
-    if (_speakingId == card.id) {
-      _stopAll();
-      return;
-    }
-    _playToken++;
-    final token = _playToken;
-    setState(() {
-      _listPlaying = false;
-      _currentId = null;
-      _speakingId = card.id;
-    });
-    _bumpPlays(card.id);
-    _speak(card.jp).then((_) {
-      if (_playToken == token) {
-        setState(() => _speakingId = null);
-      }
-    });
-  }
-
-  void _onToggleExpand(String id) {
-    setState(() => _expandedId = _expandedId == id ? null : id);
-  }
-
-  void _onArchive(String id) {
-    setState(() {
-      _cards = _cards.map((c) => c.id == id ? c.copyWith(archived: true) : c).toList();
-      _expandedId = null;
-    });
-  }
-
-  void _onRestore(String id) {
-    setState(() => _cards = _cards.map((c) => c.id == id ? c.copyWith(archived: false) : c).toList());
-  }
-
-  void _onDelete(String id) {
-    setState(() {
-      _cards = _cards.where((c) => c.id != id).toList();
-      _expandedId = null;
-    });
-  }
-
-  void _commitDictation({required String en, required String jp, required String romaji}) {
-    final id = 'new${DateTime.now().millisecondsSinceEpoch}';
-    final card = TranslationCard(
-      id: id,
-      en: en,
-      jp: '',
-      romaji: romaji,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      durationMs: 0,
-      plays: 0,
-      archived: false,
-      status: CardStatus.processing,
-      isNew: true,
-    );
-    setState(() {
-      _dictating = false;
-      _cards = [card, ..._cards];
-      _page = 'main';
-      _fs = _fs.copyWith(
-        sort: 'newest',
-        filter: _fs.filter == 'archived' ? 'active' : _fs.filter,
-        query: '',
-      );
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 80), () {
-        _scrollToIndex(0);
-      });
-    });
-    Future.delayed(const Duration(milliseconds: 2000), () {
-      if (!mounted) return;
-      setState(() {
-        _cards = _cards.map((c) => c.id == id ? c.copyWith(jp: jp, status: CardStatus.ready, isNew: false) : c).toList();
-      });
-    });
-  }
-
-  void _onNav(String p) {
-    setState(() {
-      _page = p;
-      if (p != 'main') _filterOpen = false;
-    });
-  }
-
-  void _onMic() {
-    _stopAll();
-    setState(() => _dictating = true);
-  }
-
-  Color _resolveAccentColor() {
-    for (final a in accentOptions) {
-      if (a.id == _settings.accent) return hexToColor(a.accent);
-    }
-    return const Color(0xFF17171A);
-  }
-
-  Color _resolveOnAccentColor() {
-    for (final a in accentOptions) {
-      if (a.id == _settings.accent) return hexToColor(a.onAccent);
-    }
-    return const Color(0xFFFFFFFF);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = _settings.theme == 'dark';
+    final settingsVm = context.watch<SettingsViewModel>();
+    final cardsVm = context.watch<CardsViewModel>();
+    final settings = settingsVm.settings;
+
+    final isDark = settings.theme == 'dark';
     final colors = isDark ? darkColors : lightColors;
-    final accent = _resolveAccentColor();
-    final onAccent = _resolveOnAccentColor();
-    final density = densityMultiplier(_settings.spacing);
-    final gap = gapPixels(_settings.spacing);
-    final view = _view;
-    final curIdx = max(0, view.indexWhere((c) => c.id == _currentId));
+    final accent = _resolveAccentColor(settings.accent);
+    final onAccent = _resolveOnAccentColor(settings.accent);
+    final density = densityMultiplier(settings.spacing);
+    final gap = gapPixels(settings.spacing);
+    final view = cardsVm.view;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -289,6 +70,17 @@ class _LingoAppState extends State<LingoApp> {
         body: Builder(
           builder: (context) {
             final statusBarHeight = MediaQuery.of(context).padding.top;
+
+            // Listen for API errors - context has ScaffoldMessenger here
+            _errorSub?.cancel();
+            final messenger = ScaffoldMessenger.of(context);
+            _errorSub = cardsVm.errors.listen((msg) {
+              if (!mounted) return;
+              messenger.showSnackBar(
+                SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+              );
+            });
+
             return LingoTheme(
               colors: colors,
               accent: accent,
@@ -299,7 +91,7 @@ class _LingoAppState extends State<LingoApp> {
                 children: [
                   if (_page == 'main') ...[
                     if (view.isEmpty)
-                      EmptyState(query: _fs.query)
+                      const EmptyState(query: '')
                     else
                       ListView.builder(
                         controller: _scrollController,
@@ -312,61 +104,88 @@ class _LingoAppState extends State<LingoApp> {
                         itemCount: view.length,
                         itemBuilder: (context, index) {
                           final card = view[index];
+                          final t = card.translationFor(settingsVm.settings.lang);
                           return Padding(
                             padding: EdgeInsets.only(bottom: gap),
                             child: TranslationCardWidget(
                               key: ValueKey(card.id),
                               card: card,
-                              expanded: _expandedId == card.id,
-                              current: _currentId == card.id && _listPlaying,
-                              playing: _speakingId == card.id,
-                              onToggle: () => _onToggleExpand(card.id),
-                              onPlay: () => _playOne(card),
-                              onArchive: () => _onArchive(card.id),
-                              onDelete: () => _onDelete(card.id),
-                              onRestore: () => _onRestore(card.id),
+                              translation: t,
+                              expanded: cardsVm.expandedId == card.id,
+                              current: cardsVm.currentId == card.id && cardsVm.listPlaying,
+                              playing: cardsVm.speakingId == card.id,
+                              onToggle: () => cardsVm.toggleExpand(card.id),
+                              onPlay: () => cardsVm.playOne(card, t!),
+                              onArchive: () => cardsVm.archiveCard(card),
+                              onDelete: () => cardsVm.deleteCard(card),
+                              onRestore: () => cardsVm.restoreCard(card),
                             ),
                           );
                         },
                       ),
-                FilterBar(
-                  state: _fs,
-                  onChange: (fs) => setState(() => _fs = fs),
-                  count: view.length,
-                  open: _filterOpen,
-                  setOpen: (v) => setState(() => _filterOpen = v),
-                ),
-                PlayFAB(
-                  playing: _listPlaying,
-                  onTap: _toggleListPlayback,
-                  index: curIdx,
-                  total: view.length,
-                ),
-              ],
-              if (_page == 'settings')
-                SettingsPage(
-                  settings: _settings,
-                  onChange: (s) => setState(() => _settings = s),
-                ),
-              BottomBar(
-                page: _page,
-                onNavMain: () => _onNav('main'),
-                onNavSettings: () => _onNav('settings'),
-                onMic: _onMic,
-                micActive: _dictating,
+                    FilterBar(
+                      state: cardsVm.filterState,
+                      onChange: cardsVm.updateFilterState,
+                      count: view.length,
+                      open: cardsVm.filterOpen,
+                      setOpen: cardsVm.setFilterOpen,
+                    ),
+                    PlayFAB(
+                      playing: cardsVm.listPlaying,
+                      onTap: cardsVm.toggleListPlayback,
+                      index: max(0, cardsVm.currentPlayIndex),
+                      total: view.length,
+                    ),
+                  ],
+                  if (_page == 'settings')
+                    SettingsPage(
+                      settings: settingsVm.settings,
+                      onChange: (s) => settingsVm.update(s),
+                    ),
+                  BottomBar(
+                    page: _page,
+                    onNavMain: () => setState(() => _page = 'main'),
+                    onNavSettings: () => setState(() => _page = 'settings'),
+                    onMic: () => setState(() => _dictating = true),
+                    micActive: _dictating,
+                  ),
+                  if (_dictating)
+                    DictationOverlay(
+                      onCommit: (text) {
+                        cardsVm.addCard(text);
+                        setState(() {
+                          _dictating = false;
+                          _page = 'main';
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          Future.delayed(const Duration(milliseconds: 80), () {
+                            _scrollToIndex(0);
+                          });
+                        });
+                      },
+                      onCancel: () => setState(() => _dictating = false),
+                    ),
+                ],
               ),
-              if (_dictating)
-                DictationOverlay(
-                  onCommit: _commitDictation,
-                  onCancel: () => setState(() => _dictating = false),
-                ),
-            ],
-          ),
-        );
-      },
-    ),
-  ),
-);
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Color _resolveAccentColor(String accentId) {
+    for (final a in accentOptions) {
+      if (a.id == accentId) return hexToColor(a.accent);
+    }
+    return const Color(0xFF17171A);
+  }
+
+  Color _resolveOnAccentColor(String accentId) {
+    for (final a in accentOptions) {
+      if (a.id == accentId) return hexToColor(a.onAccent);
+    }
+    return const Color(0xFFFFFFFF);
   }
 }
 

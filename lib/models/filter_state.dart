@@ -3,7 +3,7 @@ class FilterState {
   final bool reshuffle;
   final String filter;
   final String query;
-  final List<String>? shuffledIds;
+  final List<int>? shuffledIds;
 
   const FilterState({
     this.sort = 'newest',
@@ -18,7 +18,7 @@ class FilterState {
     bool? reshuffle,
     String? filter,
     String? query,
-    List<String>? shuffledIds,
+    List<int>? shuffledIds,
   }) {
     return FilterState(
       sort: sort ?? this.sort,

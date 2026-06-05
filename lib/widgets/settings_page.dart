@@ -290,6 +290,35 @@ class SettingsPage extends StatelessWidget {
                 ],
               ),
             ),
+            _Section(
+              title: 'Shadow pause',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SegmentedControl(
+                    options: const [
+                      SegmentedOption('none', 'None'),
+                      SegmentedOption('short', 'Short'),
+                      SegmentedOption('medium', 'Medium'),
+                      SegmentedOption('long', 'Long'),
+                      SegmentedOption('clip', 'Clip'),
+                    ],
+                    value: settings.shadowDelay,
+                    onChange: (v) => onChange(settings.copyWith(shadowDelay: v)),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2),
+                    child: Text(
+                      settings.shadowDelay == 'clip'
+                          ? 'Wait half the clip duration before playing the next card.'
+                          : 'Pause between cards during playback for shadowing practice.',
+                      style: TextStyle(fontSize: 12.5, height: 1.4, color: theme.colors.inkSoft),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
             Center(
               child: Text(

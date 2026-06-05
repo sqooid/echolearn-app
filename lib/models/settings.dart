@@ -40,12 +40,14 @@ class AppSettings {
   final String theme;
   final String accent;
   final String spacing;
+  final String shadowDelay;
 
   const AppSettings({
     this.lang = 'jp',
     this.theme = 'light',
     this.accent = 'mono',
     this.spacing = 'cozy',
+    this.shadowDelay = 'medium',
   });
 
   AppSettings copyWith({
@@ -53,12 +55,14 @@ class AppSettings {
     String? theme,
     String? accent,
     String? spacing,
+    String? shadowDelay,
   }) {
     return AppSettings(
       lang: lang ?? this.lang,
       theme: theme ?? this.theme,
       accent: accent ?? this.accent,
       spacing: spacing ?? this.spacing,
+      shadowDelay: shadowDelay ?? this.shadowDelay,
     );
   }
 }

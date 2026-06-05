@@ -26,23 +26,22 @@ class _NavButtonState extends State<NavButton> {
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          widget.onTap();
-        },
-        onTapCancel: () => setState(() => _pressed = false),
-        child: Opacity(
-          opacity: _pressed ? 0.7 : 1.0,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: const Cubic(0.32, 0.72, 0, 1),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: Opacity(
+        opacity: _pressed ? 0.7 : 1.0,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: const Cubic(0.32, 0.72, 0, 1),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               widget.icon,
               const SizedBox(height: 3),
               Text(
@@ -57,7 +56,6 @@ class _NavButtonState extends State<NavButton> {
             ],
           ),
         ),
-      ),
       ),
     );
   }

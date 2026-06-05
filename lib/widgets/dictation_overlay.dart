@@ -5,7 +5,7 @@ import 'icons.dart';
 import 'oscilloscope.dart';
 
 class DictationOverlay extends StatefulWidget {
-  final void Function({required String en, required String jp, required String romaji}) onCommit;
+  final ValueChanged<String> onCommit;
   final VoidCallback onCancel;
 
   const DictationOverlay({
@@ -79,11 +79,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
     _speech.stop();
     final text = _recognized.trim();
     Future.delayed(const Duration(milliseconds: 240), () {
-      widget.onCommit(
-        en: text,
-        jp: '翻訳中…',
-        romaji: 'Honyakuchū…',
-      );
+      widget.onCommit(text);
     });
   }
 
