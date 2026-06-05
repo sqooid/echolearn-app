@@ -524,3 +524,31 @@ class IconRestore extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LingoIcon(size: size, strokeWidth: sw, color: color, pathBuilder: _restorePath);
 }
+
+Path _plusPath(Size s) => Path()
+  ..moveTo(12, 5)
+  ..lineTo(12, 19)
+  ..moveTo(5, 12)
+  ..lineTo(19, 12);
+
+class IconPlus extends StatelessWidget {
+  final double size;
+  final double sw;
+  final Color? color;
+  const IconPlus({super.key, this.size = 24, this.sw = 1.8, this.color});
+  @override
+  Widget build(BuildContext context) => LingoIcon(size: size, strokeWidth: sw, color: color, pathBuilder: _plusPath);
+}
+
+Path _minusPath(Size s) => Path()
+  ..moveTo(5, 12)
+  ..lineTo(19, 12);
+
+class IconMinus extends StatelessWidget {
+  final double size;
+  final double sw;
+  final Color? color;
+  const IconMinus({super.key, this.size = 24, this.sw = 1.8, this.color});
+  @override
+  Widget build(BuildContext context) => LingoIcon(size: size, strokeWidth: sw, color: color, pathBuilder: _minusPath);
+}

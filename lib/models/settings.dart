@@ -40,7 +40,8 @@ class AppSettings {
   final String theme;
   final String accent;
   final String spacing;
-  final String shadowDelay;
+  final double delaySeconds;
+  final bool delayAddClip;
   final String apiKey;
 
   const AppSettings({
@@ -48,7 +49,8 @@ class AppSettings {
     this.theme = 'light',
     this.accent = 'mono',
     this.spacing = 'cozy',
-    this.shadowDelay = 'medium',
+    this.delaySeconds = 0,
+    this.delayAddClip = false,
     this.apiKey = '',
   });
 
@@ -57,7 +59,8 @@ class AppSettings {
     String? theme,
     String? accent,
     String? spacing,
-    String? shadowDelay,
+    double? delaySeconds,
+    bool? delayAddClip,
     String? apiKey,
   }) {
     return AppSettings(
@@ -65,7 +68,8 @@ class AppSettings {
       theme: theme ?? this.theme,
       accent: accent ?? this.accent,
       spacing: spacing ?? this.spacing,
-      shadowDelay: shadowDelay ?? this.shadowDelay,
+      delaySeconds: delaySeconds ?? this.delaySeconds,
+      delayAddClip: delayAddClip ?? this.delayAddClip,
       apiKey: apiKey ?? this.apiKey,
     );
   }

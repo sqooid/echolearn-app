@@ -134,63 +134,43 @@ class DatabaseService {
 
   static Future<List<TranslationCard>> getAllCards(String language) async {
     final db = await database;
-    final rows = await db.rawQuery('''
-      SELECT c.*, t.id as t_id, t.language, t.text, t.audio_data, t.duration_ms
-      FROM cards c
-      LEFT JOIN translations t ON t.card_id = c.id AND t.language = ?
-      ORDER BY c.created_at DESC
-    ''', [language]);
-    return _rowsToCards(rows);
+    final cardRows = await db.query('cards', orderBy: 'created_at DESC');
+    final translations = await db.query('translations', where: 'language = ?', whereArgs: [language]);
+    return _buildCards(cardRows, translations);
   }
 
   static Future<TranslationCard?> getCardWithTranslation(int cardId, String language) async {
     final db = await database;
-    final rows = await db.rawQuery('''
-      SELECT c.*, t.id as t_id, t.language, t.text, t.audio_data, t.duration_ms
-      FROM cards c
-      LEFT JOIN translations t ON t.card_id = c.id AND t.language = ?
-      WHERE c.id = ?
-    ''', [language, cardId]);
-    if (rows.isEmpty) return null;
-    return _rowsToCards(rows).first;
+    final cardRows = await db.query('cards', where: 'id = ?', whereArgs: [cardId]);
+    if (cardRows.isEmpty) return null;
+    final translations = await db.query('translations', where: 'card_id = ? AND language = ?', whereArgs: [cardId, language]);
+    return _buildCards(cardRows, translations).first;
   }
 
-  static List<TranslationCard> _rowsToCards(List<Map<String, dynamic>> rows) {
-    // Group by card id — LEFT JOIN may produce rows with null translation fields
-    final cardMap = <int, TranslationCard>{};
-    for (final row in rows) {
-      final id = row['id'] as int;
-      final entry = row['text'] != null
-          ? TranslationEntry(
-              id: row['t_id'] as int?,
-              cardId: id,
-              language: row['language'] as String,
-              text: row['text'] as String,
-              audioData: row['audio_data'] != null
-                  ? List<int>.from(row['audio_data'] as List)
-                  : null,
-              durationMs: row['duration_ms'] as int?,
-            )
-          : null;
-
-      if (cardMap.containsKey(id)) {
-        if (entry != null) {
-          cardMap[id] = cardMap[id]!.copyWith(
-            translations: [...cardMap[id]!.translations, entry],
-          );
-        }
-      } else {
-        cardMap[id] = TranslationCard(
-          id: id,
-          en: row['en'] as String,
-          createdAt: row['created_at'] as int,
-          plays: row['plays'] as int,
-          archived: (row['archived'] as int) == 1,
-          translations: entry != null ? [entry] : [],
-        );
-      }
+  static List<TranslationCard> _buildCards(List<Map<String, dynamic>> cardRows, List<Map<String, dynamic>> translations) {
+    final transByCard = <int, List<TranslationEntry>>{};
+    for (final t in translations) {
+      final cardId = t['card_id'] as int;
+      transByCard.putIfAbsent(cardId, () => []).add(TranslationEntry(
+        id: t['id'] as int,
+        cardId: cardId,
+        language: t['language'] as String,
+        text: t['text'] as String,
+        audioData: t['audio_data'] != null ? List<int>.from(t['audio_data'] as List) : null,
+        durationMs: t['duration_ms'] as int?,
+      ));
     }
-    return cardMap.values.toList();
+    return cardRows.map((row) {
+      final id = row['id'] as int;
+      return TranslationCard(
+        id: id,
+        en: row['en'] as String,
+        createdAt: row['created_at'] as int,
+        plays: row['plays'] as int,
+        archived: (row['archived'] as int) == 1,
+        translations: transByCard[id] ?? [],
+      );
+    }).toList();
   }
 
   // ── Settings ──
@@ -216,14 +196,16 @@ class DatabaseService {
     final theme = await getSetting('theme') ?? 'light';
     final accent = await getSetting('accent') ?? 'mono';
     final spacing = await getSetting('spacing') ?? 'cozy';
-    final shadowDelay = await getSetting('shadowDelay') ?? 'medium';
+    final delaySeconds = double.tryParse(await getSetting('delaySeconds') ?? '0') ?? 0;
+    final delayAddClip = (await getSetting('delayAddClip') ?? 'false') == 'true';
     final apiKey = await getSetting('apiKey') ?? '';
     return AppSettings(
       lang: lang,
       theme: theme,
       accent: accent,
       spacing: spacing,
-      shadowDelay: shadowDelay,
+      delaySeconds: delaySeconds,
+      delayAddClip: delayAddClip,
       apiKey: apiKey,
     );
   }
@@ -233,7 +215,8 @@ class DatabaseService {
     await setSetting('theme', settings.theme);
     await setSetting('accent', settings.accent);
     await setSetting('spacing', settings.spacing);
-    await setSetting('shadowDelay', settings.shadowDelay);
+    await setSetting('delaySeconds', settings.delaySeconds.toString());
+    await setSetting('delayAddClip', settings.delayAddClip.toString());
     await setSetting('apiKey', settings.apiKey);
   }
 }

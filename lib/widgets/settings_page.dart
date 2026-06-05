@@ -295,24 +295,64 @@ class SettingsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SegmentedControl(
-                    options: const [
-                      SegmentedOption('none', 'None'),
-                      SegmentedOption('short', 'Short'),
-                      SegmentedOption('medium', 'Medium'),
-                      SegmentedOption('long', 'Long'),
-                      SegmentedOption('clip', 'Clip'),
+                  Row(
+                    children: [
+                      _StepButton(
+                        icon: IconMinus(size: 16, sw: 2.5, color: theme.colors.ink),
+                        onTap: () {
+                          final v = (settings.delaySeconds - 0.5).clamp(0.0, double.infinity).toDouble();
+                          onChange(settings.copyWith(delaySeconds: v));
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 64,
+                        child: TextField(
+                          controller: _DelayController(settings.delaySeconds.toString()),
+                          textAlign: TextAlign.center,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (v) {
+                            final d = double.tryParse(v.replaceAll(',', '.'));
+                            if (d != null && d >= 0) {
+                              onChange(settings.copyWith(delaySeconds: d));
+                            }
+                          },
+                          style: TextStyle(fontSize: 14.5, color: theme.colors.ink),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colors.borderStrong)),
+                            suffixText: 's',
+                            suffixStyle: TextStyle(fontSize: 13, color: theme.colors.inkSoft),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StepButton(
+                        icon: IconPlus(size: 16, sw: 2.5, color: theme.colors.ink),
+                        onTap: () {
+                          final v = settings.delaySeconds + 0.5;
+                          onChange(settings.copyWith(delaySeconds: v));
+                        },
+                      ),
                     ],
-                    value: settings.shadowDelay,
-                    onChange: (v) => onChange(settings.copyWith(shadowDelay: v)),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text('Add clip length', style: TextStyle(fontSize: 14, color: theme.colors.ink)),
+                      const Spacer(),
+                      Toggle(
+                        on: settings.delayAddClip,
+                        onChange: (v) => onChange(settings.copyWith(delayAddClip: v)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.only(left: 2),
                     child: Text(
-                      settings.shadowDelay == 'clip'
-                          ? 'Wait half the clip duration before playing the next card.'
-                          : 'Pause between cards during playback for shadowing practice.',
+                      'Pause between cards during playback. Increments by 0.5s.',
                       style: TextStyle(fontSize: 12.5, height: 1.4, color: theme.colors.inkSoft),
                     ),
                   ),
@@ -323,14 +363,15 @@ class SettingsPage extends StatelessWidget {
               title: 'API key',
               child: TextField(
                 obscureText: true,
-                controller: TextEditingController(text: settings.apiKey),
+                controller: _ApiKeyController(settings.apiKey),
                 onChanged: (v) => onChange(settings.copyWith(apiKey: v)),
-                style: TextStyle(fontSize: 14.5, color: theme.colors.ink),
+                style: TextStyle(fontSize: 14.5, color: theme.colors.ink, height: 1.3),
                 decoration: InputDecoration(
-                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   hintText: 'Enter API key…',
-                  hintStyle: TextStyle(color: theme.colors.inkFaint),
-                  border: InputBorder.none,
+                  hintStyle: TextStyle(fontSize: 14.5, color: theme.colors.inkFaint),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colors.borderStrong)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colors.borderStrong)),
                   suffixIcon: settings.apiKey.isNotEmpty
                       ? IconButton(
                           icon: IconClose(size: 16, color: theme.colors.inkFaint),
@@ -394,6 +435,39 @@ class _Section extends StatelessWidget {
             child: child,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ApiKeyController extends TextEditingController {
+  _ApiKeyController(String text) : super(text: text);
+}
+
+class _DelayController extends TextEditingController {
+  _DelayController(String text) : super(text: text);
+}
+
+class _StepButton extends StatelessWidget {
+  final Widget icon;
+  final VoidCallback onTap;
+
+  const _StepButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.colors.borderStrong),
+          color: theme.colors.surface2,
+        ),
+        child: Center(child: icon),
       ),
     );
   }

@@ -93,18 +93,7 @@ class CardsViewModel extends ChangeNotifier {
     return v;
   }
 
-  Future<void> load() => _repository.load(_languageCode(_lang));
-
-// At bottom of file (outside class) add:
-String _languageCode(String settingLang) {
-  switch (settingLang) {
-    case 'jp': return 'ja';
-    case 'ko': return 'ko';
-    case 'zh': return 'zh-Hans';
-    case 'es': return 'es';
-    default: return 'ja';
-  }
-}
+  Future<void> load() => _repository.load(_lang);
 
   Future<void> addCard(String enText) async {
     final card = await _repository.addCard(enText);
@@ -154,7 +143,12 @@ String _languageCode(String settingLang) {
     _speakingId = card.id;
     _repository.bumpPlays(card);
     notifyListeners();
-    _playAudio(token, card, translation);
+    _playAndWait(token, translation.audioData!, () {
+      if (_playToken == token) {
+        _speakingId = null;
+        notifyListeners();
+      }
+    });
   }
 
   void toggleListPlayback() {
@@ -180,13 +174,14 @@ String _languageCode(String settingLang) {
       if (_fs.reshuffle && list.isNotEmpty) {
         final ids = _shuffle(list.map((c) => c.id!).toList());
         _fs = _fs.copyWith(sort: 'shuffle', shuffledIds: ids);
-        notifyListeners();
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (_playToken == token) _playStep(0, token);
-        });
+        if (_playToken == token) {
+          notifyListeners();
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (_playToken == token) _playStep(0, token);
+          });
+        }
         return;
       }
-      // Always loop back to start
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_playToken == token) _playStep(0, token);
       });
@@ -202,50 +197,45 @@ String _languageCode(String settingLang) {
     _currentId = card.id;
     _repository.bumpPlays(card);
     notifyListeners();
-    _playAudio(token, card, t);
+    _playAndWait(token, t.audioData!, () {
+      if (_playToken != token) return;
+      // Clip ended — clear play icon but keep outline
+      _speakingId = null;
+      notifyListeners();
+      // Wait for shadow delay
+      final delayMs = _shadowDelayMs(card, t);
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (_playToken != token) return;
+        _currentId = null;
+        notifyListeners();
+        _playStep(i + 1, token);
+      });
+    });
   }
 
-  Future<void> _playAudio(int token, TranslationCard card, TranslationEntry translation) async {
-    if (translation.audioData == null) return;
-    try {
-      await _audio.playBytes(Uint8List.fromList(translation.audioData!));
-    } catch (_) {
-      // fall through to delay
-    }
-    // Shadowing delay between cards
-    final delayMs = _shadowDelayMs(card, translation);
-    if (delayMs > 0) {
-      await Future.delayed(Duration(milliseconds: delayMs));
-    }
-    _onAudioComplete();
+  StreamSubscription<void>? _completeSub;
+
+  void _playAndWait(int token, List<int> audioData, VoidCallback onDone) {
+    _completeSub?.cancel();
+    _completeSub = _audio.onComplete.listen((_) {
+      _completeSub?.cancel();
+      onDone();
+    });
+    _audio.playBytes(Uint8List.fromList(audioData));
   }
 
   int _shadowDelayMs(TranslationCard card, TranslationEntry translation) {
-    final setting = _settings.settings.shadowDelay;
-    switch (setting) {
-      case 'none': return 0;
-      case 'short': return 1500;
-      case 'medium': return 3000;
-      case 'long': return 5000;
-      case 'clip': return (translation.durationMs ?? 2000) ~/ 2;
-      default: return 3000;
+    final s = _settings.settings;
+    var ms = (s.delaySeconds * 1000).round();
+    if (s.delayAddClip) {
+      ms += translation.durationMs ?? 2000;
     }
-  }
-
-  void _onAudioComplete() {
-    if (!_listPlaying) {
-      _speakingId = null;
-      notifyListeners();
-      return;
-    }
-    final list = view;
-    final idx = list.indexWhere((c) => c.id == _speakingId);
-    final nextIdx = (idx < 0 || idx >= list.length - 1) ? list.length : idx + 1;
-    _playStep(nextIdx, _playToken);
+    return ms;
   }
 
   void _stopAll() {
     _playToken++;
+    _completeSub?.cancel();
     _audio.stop();
     _listPlaying = false;
     _speakingId = null;

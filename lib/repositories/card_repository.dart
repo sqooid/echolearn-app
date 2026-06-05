@@ -149,6 +149,7 @@ class CardRepository {
 }
 
 String _languageCode(String settingLang) {
+  // Map settings key to API language code for TTS/translate calls
   switch (settingLang) {
     case 'jp': return 'ja';
     case 'ko': return 'ko';
