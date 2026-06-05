@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access for speech-to-text dictation.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Lang App</string>
 	<key>CFBundleExecutable</key>
