@@ -384,7 +384,7 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'LINGO · v1.0',
+                'EchoLearn · v0.1',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 11,

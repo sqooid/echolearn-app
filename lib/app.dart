@@ -12,14 +12,14 @@ import 'widgets/card_widget.dart';
 import 'widgets/dictation_overlay.dart';
 import 'widgets/settings_page.dart';
 
-class LingoApp extends StatefulWidget {
-  const LingoApp({super.key});
+class EchoLearnApp extends StatefulWidget {
+  const EchoLearnApp({super.key});
 
   @override
-  State<LingoApp> createState() => _LingoAppState();
+  State<EchoLearnApp> createState() => _EchoLearnAppState();
 }
 
-class _LingoAppState extends State<LingoApp> {
+class _EchoLearnAppState extends State<EchoLearnApp> {
   bool _dictating = false;
   String _page = 'main';
   final ScrollController _scrollController = ScrollController();

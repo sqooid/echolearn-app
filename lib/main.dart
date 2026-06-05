@@ -10,17 +10,17 @@ import 'viewmodels/settings_viewmodel.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const LingoAppRoot());
+  runApp(const EchoLearnAppRoot());
 }
 
-class LingoAppRoot extends StatefulWidget {
-  const LingoAppRoot({super.key});
+class EchoLearnAppRoot extends StatefulWidget {
+  const EchoLearnAppRoot({super.key});
 
   @override
-  State<LingoAppRoot> createState() => _LingoAppRootState();
+  State<EchoLearnAppRoot> createState() => _EchoLearnAppRootState();
 }
 
-class _LingoAppRootState extends State<LingoAppRoot> {
+class _EchoLearnAppRootState extends State<EchoLearnAppRoot> {
   late final CardRepository _cardRepo;
   late final SettingsRepository _settingsRepo;
   late final CardsViewModel _cardsVm;
@@ -59,7 +59,7 @@ class _LingoAppRootState extends State<LingoAppRoot> {
         ChangeNotifierProvider.value(value: _cardsVm),
         ChangeNotifierProvider.value(value: _settingsVm),
       ],
-      child: const LingoApp(),
+      child: const EchoLearnApp(),
     );
   }
 }

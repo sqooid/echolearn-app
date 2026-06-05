@@ -14,7 +14,7 @@ class DatabaseService {
 
   static Future<Database> _initDb() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'lingo.db');
+    final path = join(dbPath, 'echolearn.db');
 
     return openDatabase(
       path,
