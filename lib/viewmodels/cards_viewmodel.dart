@@ -33,7 +33,6 @@ class CardsViewModel extends ChangeNotifier {
   FilterState _fs = const FilterState();
   int _playToken = 0;
   StreamSubscription<List<TranslationCard>>? _sub;
-  StreamSubscription<void>? _completeSub;
 
   CardsViewModel({
     required CardRepository repository,
@@ -46,12 +45,12 @@ class CardsViewModel extends ChangeNotifier {
       _cards = cards;
       notifyListeners();
     });
-    _completeSub = _audio.onComplete.listen((_) => _onAudioComplete());
   }
 
   String get _lang => _settings.settings.lang;
 
   List<TranslationCard> get cards => _cards;
+  CardRepository get repository => _repository;
   int? get expandedId => _expandedId;
   int? get speakingId => _speakingId;
   int? get currentId => _currentId;
@@ -94,7 +93,18 @@ class CardsViewModel extends ChangeNotifier {
     return v;
   }
 
-  Future<void> load() => _repository.load();
+  Future<void> load() => _repository.load(_languageCode(_lang));
+
+// At bottom of file (outside class) add:
+String _languageCode(String settingLang) {
+  switch (settingLang) {
+    case 'jp': return 'ja';
+    case 'ko': return 'ko';
+    case 'zh': return 'zh-Hans';
+    case 'es': return 'es';
+    default: return 'ja';
+  }
+}
 
   Future<void> addCard(String enText) async {
     final card = await _repository.addCard(enText);
@@ -251,7 +261,6 @@ class CardsViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
-    _completeSub?.cancel();
     _audio.dispose();
     super.dispose();
   }

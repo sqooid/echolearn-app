@@ -16,10 +16,14 @@ class CardRepository {
   Stream<List<TranslationCard>> get cards => _controller.stream;
   Stream<String> get errors => _errorController.stream;
 
-  Future<void> load() async {
-    _cache = await DatabaseService.getAllCards();
+  void setApiKey(String key) {
+    _api.apiKey = key;
+  }
+
+  Future<void> load(String language) async {
+    _cache = await DatabaseService.getAllCards(language);
     _controller.add(_cache);
-    _processPending('ja');
+    _processPending(language);
   }
 
   void _processPending(String language) {
@@ -62,7 +66,7 @@ class CardRepository {
           language: language,
           text: translation.text,
         ));
-        await _refreshCard(card.id!);
+        await _refreshCard(card.id!, language);
       }
 
       // Get fresh card after potential translation save
@@ -82,7 +86,7 @@ class CardRepository {
             audioData: audio,
             durationMs: estimatedDuration,
           ));
-          await _refreshCard(card.id!);
+          await _refreshCard(card.id!, language);
         } catch (_) {
           // TTS failed — card still usable with translation
         }
@@ -92,16 +96,9 @@ class CardRepository {
     }
   }
 
-  Future<void> _refreshCard(int cardId) async {
-    final db = await DatabaseService.database;
-    final rows = await db.query('cards', where: 'id = ?', whereArgs: [cardId]);
-    if (rows.isEmpty) return;
-    final translations = await db.query(
-      'translations',
-      where: 'card_id = ?',
-      whereArgs: [cardId],
-    );
-    final updated = DatabaseService.rowToCard(rows.first, translations);
+  Future<void> _refreshCard(int cardId, String language) async {
+    final updated = await DatabaseService.getCardWithTranslation(cardId, language);
+    if (updated == null) return;
     final index = _cache.indexWhere((c) => c.id == cardId);
     if (index >= 0) {
       _cache[index] = updated;

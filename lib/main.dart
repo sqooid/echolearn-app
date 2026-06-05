@@ -41,6 +41,7 @@ class _LingoAppRootState extends State<LingoAppRoot> {
     _settingsVm = SettingsViewModel(repository: _settingsRepo);
 
     await _settingsVm.load();
+    _cardRepo.setApiKey(_settingsVm.settings.apiKey);
     await _cardsVm.load();
 
     if (mounted) setState(() => _ready = true);

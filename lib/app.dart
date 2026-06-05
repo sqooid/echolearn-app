@@ -54,6 +54,7 @@ class _LingoAppState extends State<LingoApp> {
     final settingsVm = context.watch<SettingsViewModel>();
     final cardsVm = context.watch<CardsViewModel>();
     final settings = settingsVm.settings;
+    cardsVm.repository.setApiKey(settings.apiKey);
 
     final isDark = settings.theme == 'dark';
     final colors = isDark ? darkColors : lightColors;

@@ -319,6 +319,27 @@ class SettingsPage extends StatelessWidget {
                 ],
               ),
             ),
+            _Section(
+              title: 'API key',
+              child: TextField(
+                obscureText: true,
+                controller: TextEditingController(text: settings.apiKey),
+                onChanged: (v) => onChange(settings.copyWith(apiKey: v)),
+                style: TextStyle(fontSize: 14.5, color: theme.colors.ink),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Enter API key…',
+                  hintStyle: TextStyle(color: theme.colors.inkFaint),
+                  border: InputBorder.none,
+                  suffixIcon: settings.apiKey.isNotEmpty
+                      ? IconButton(
+                          icon: IconClose(size: 16, color: theme.colors.inkFaint),
+                          onPressed: () => onChange(settings.copyWith(apiKey: '')),
+                        )
+                      : null,
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
             Center(
               child: Text(

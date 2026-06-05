@@ -41,6 +41,7 @@ class AppSettings {
   final String accent;
   final String spacing;
   final String shadowDelay;
+  final String apiKey;
 
   const AppSettings({
     this.lang = 'jp',
@@ -48,6 +49,7 @@ class AppSettings {
     this.accent = 'mono',
     this.spacing = 'cozy',
     this.shadowDelay = 'medium',
+    this.apiKey = '',
   });
 
   AppSettings copyWith({
@@ -56,6 +58,7 @@ class AppSettings {
     String? accent,
     String? spacing,
     String? shadowDelay,
+    String? apiKey,
   }) {
     return AppSettings(
       lang: lang ?? this.lang,
@@ -63,6 +66,7 @@ class AppSettings {
       accent: accent ?? this.accent,
       spacing: spacing ?? this.spacing,
       shadowDelay: shadowDelay ?? this.shadowDelay,
+      apiKey: apiKey ?? this.apiKey,
     );
   }
 }

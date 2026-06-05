@@ -132,44 +132,65 @@ class DatabaseService {
     await db.delete('cards', where: 'id = ?', whereArgs: [id]);
   }
 
-  static Future<List<TranslationCard>> getAllCards() async {
+  static Future<List<TranslationCard>> getAllCards(String language) async {
     final db = await database;
-    final cardRows = await db.query('cards', orderBy: 'created_at DESC');
-    final cards = <TranslationCard>[];
-    for (final row in cardRows) {
-      final translations = await db.query(
-        'translations',
-        where: 'card_id = ?',
-        whereArgs: [row['id']],
-      );
-      cards.add(rowToCard(row, translations));
-    }
-    return cards;
+    final rows = await db.rawQuery('''
+      SELECT c.*, t.id as t_id, t.language, t.text, t.audio_data, t.duration_ms
+      FROM cards c
+      LEFT JOIN translations t ON t.card_id = c.id AND t.language = ?
+      ORDER BY c.created_at DESC
+    ''', [language]);
+    return _rowsToCards(rows);
   }
 
-  static TranslationCard rowToCard(
-    Map<String, dynamic> row,
-    List<Map<String, dynamic>> translations,
-  ) {
-    return TranslationCard(
-      id: row['id'] as int,
-      en: row['en'] as String,
-      createdAt: row['created_at'] as int,
-      plays: row['plays'] as int,
-      archived: (row['archived'] as int) == 1,
-      translations: translations.map((t) {
-        return TranslationEntry(
-          id: t['id'] as int,
-          cardId: t['card_id'] as int,
-          language: t['language'] as String,
-          text: t['text'] as String,
-          audioData: t['audio_data'] != null
-              ? List<int>.from(t['audio_data'] as List)
-              : null,
-          durationMs: t['duration_ms'] as int?,
+  static Future<TranslationCard?> getCardWithTranslation(int cardId, String language) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT c.*, t.id as t_id, t.language, t.text, t.audio_data, t.duration_ms
+      FROM cards c
+      LEFT JOIN translations t ON t.card_id = c.id AND t.language = ?
+      WHERE c.id = ?
+    ''', [language, cardId]);
+    if (rows.isEmpty) return null;
+    return _rowsToCards(rows).first;
+  }
+
+  static List<TranslationCard> _rowsToCards(List<Map<String, dynamic>> rows) {
+    // Group by card id — LEFT JOIN may produce rows with null translation fields
+    final cardMap = <int, TranslationCard>{};
+    for (final row in rows) {
+      final id = row['id'] as int;
+      final entry = row['text'] != null
+          ? TranslationEntry(
+              id: row['t_id'] as int?,
+              cardId: id,
+              language: row['language'] as String,
+              text: row['text'] as String,
+              audioData: row['audio_data'] != null
+                  ? List<int>.from(row['audio_data'] as List)
+                  : null,
+              durationMs: row['duration_ms'] as int?,
+            )
+          : null;
+
+      if (cardMap.containsKey(id)) {
+        if (entry != null) {
+          cardMap[id] = cardMap[id]!.copyWith(
+            translations: [...cardMap[id]!.translations, entry],
+          );
+        }
+      } else {
+        cardMap[id] = TranslationCard(
+          id: id,
+          en: row['en'] as String,
+          createdAt: row['created_at'] as int,
+          plays: row['plays'] as int,
+          archived: (row['archived'] as int) == 1,
+          translations: entry != null ? [entry] : [],
         );
-      }).toList(),
-    );
+      }
+    }
+    return cardMap.values.toList();
   }
 
   // ── Settings ──
@@ -196,12 +217,14 @@ class DatabaseService {
     final accent = await getSetting('accent') ?? 'mono';
     final spacing = await getSetting('spacing') ?? 'cozy';
     final shadowDelay = await getSetting('shadowDelay') ?? 'medium';
+    final apiKey = await getSetting('apiKey') ?? '';
     return AppSettings(
       lang: lang,
       theme: theme,
       accent: accent,
       spacing: spacing,
       shadowDelay: shadowDelay,
+      apiKey: apiKey,
     );
   }
 
@@ -211,5 +234,6 @@ class DatabaseService {
     await setSetting('accent', settings.accent);
     await setSetting('spacing', settings.spacing);
     await setSetting('shadowDelay', settings.shadowDelay);
+    await setSetting('apiKey', settings.apiKey);
   }
 }
