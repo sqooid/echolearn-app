@@ -314,7 +314,7 @@ class TranslationCardWidget extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  SelectableText(
                     translation?.text ?? '',
                     style: TextStyle(
                       fontSize: 25, height: 1.4, fontWeight: FontWeight.w500,
