@@ -310,17 +310,16 @@ class SpeechToText {
       debugLogging = false,
       Duration finalTimeout = defaultFinalTimeout,
       List<SpeechConfigOption>? options}) async {
-    if (_initWorked) {
-      return Future.value(_initWorked);
-    }
     _finalTimeout = finalTimeout;
-    if (finalTimeout <= _minFinalTimeout) {}
     errorListener = onError;
     statusListener = onStatus;
     SpeechToTextPlatform.instance.onTextRecognition = _onTextRecognition;
     SpeechToTextPlatform.instance.onError = _onNotifyError;
     SpeechToTextPlatform.instance.onStatus = _onNotifyStatus;
     SpeechToTextPlatform.instance.onSoundLevel = _onSoundLevelChange;
+    if (_initWorked) {
+      return Future.value(_initWorked);
+    }
     _initWorked = await SpeechToTextPlatform.instance
         .initialize(debugLogging: debugLogging, options: options);
     return _initWorked;

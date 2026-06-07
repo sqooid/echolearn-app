@@ -4,6 +4,8 @@ import '../utils/theme.dart';
 import 'icons.dart';
 import 'oscilloscope.dart';
 
+enum _Phase { warming, listening, stopped, captured, error }
+
 class DictationOverlay extends StatefulWidget {
   final ValueChanged<String> onCommit;
   final VoidCallback onCancel;
@@ -21,8 +23,7 @@ class DictationOverlay extends StatefulWidget {
 class _DictationOverlayState extends State<DictationOverlay> {
   final _speech = stt.SpeechToText();
   String _recognized = '';
-  bool _listening = true;
-  bool _done = false;
+  _Phase _phase = _Phase.warming;
   String _error = '';
 
   @override
@@ -37,12 +38,24 @@ class _DictationOverlayState extends State<DictationOverlay> {
         if (!mounted) return;
         setState(() {
           _error = error.errorMsg;
-          _listening = false;
+          _phase = _Phase.error;
         });
       },
       onStatus: (status) {
-        if (status == 'done' && !_done) {
-          setState(() => _listening = false);
+        if (!mounted) return;
+        switch (status) {
+          case 'ready_for_speech':
+          case 'listening':
+            if (_phase == _Phase.warming) {
+              setState(() => _phase = _Phase.listening);
+            }
+            break;
+          case 'notListening':
+          case 'done':
+            if (_phase == _Phase.listening) {
+              setState(() => _phase = _Phase.stopped);
+            }
+            break;
         }
       },
     );
@@ -50,7 +63,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
     if (!available) {
       setState(() {
         _error = 'Speech recognition not available';
-        _listening = false;
+        _phase = _Phase.error;
       });
       return;
     }
@@ -60,7 +73,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
   void _startListening() {
     _speech.listen(
       onResult: (result) {
-        if (!mounted || _done) return;
+        if (!mounted || _phase != _Phase.listening) return;
         setState(() {
           _recognized = result.recognizedWords;
         });
@@ -69,13 +82,14 @@ class _DictationOverlayState extends State<DictationOverlay> {
         autoPunctuation: true,
         partialResults: true,
         localeId: 'en_US',
+        listenMode: stt.ListenMode.dictation,
       ),
     );
   }
 
   void _finish() {
-    if (_done) return;
-    setState(() => _done = true);
+    if (_phase != _Phase.listening && _phase != _Phase.stopped) return;
+    setState(() => _phase = _Phase.captured);
     _speech.stop();
     final text = _recognized.trim();
     Future.delayed(const Duration(milliseconds: 240), () {
@@ -88,6 +102,23 @@ class _DictationOverlayState extends State<DictationOverlay> {
     _speech.stop();
     super.dispose();
   }
+
+  String get _statusText {
+    switch (_phase) {
+      case _Phase.warming:
+        return 'Loading speech model\u2026';
+      case _Phase.listening:
+        return 'Listening \u2022 English';
+      case _Phase.stopped:
+        return 'Stopped \u2022 English';
+      case _Phase.captured:
+        return 'Captured';
+      case _Phase.error:
+        return 'Error';
+    }
+  }
+
+  bool get _isListening => _phase == _Phase.listening;
 
   @override
   Widget build(BuildContext context) {
@@ -134,10 +165,10 @@ class _DictationOverlayState extends State<DictationOverlay> {
                         children: [
                           Row(
                             children: [
-                              _PulsingDot(active: _listening, accent: theme.accent),
+                              _PulsingDot(active: _isListening, accent: theme.accent),
                               const SizedBox(width: 8),
                               Text(
-                                _done ? 'Captured' : (_listening ? 'Listening \u2022 English' : 'Ready'),
+                                _statusText,
                                 style: TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 11,
@@ -160,7 +191,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
                               child: Text.rich(
                                 TextSpan(
                                   children: [
-                                    if (_error.isNotEmpty)
+                                    if (_phase == _Phase.error)
                                       TextSpan(
                                         text: _error,
                                         style: TextStyle(
@@ -172,19 +203,19 @@ class _DictationOverlayState extends State<DictationOverlay> {
                                       )
                                     else ...[
                                       TextSpan(
-                                        text: _recognized.isEmpty && _listening
+                                        text: _recognized.isEmpty && _isListening
                                             ? 'Start speaking\u2026'
                                             : _recognized,
                                         style: TextStyle(
                                           fontSize: 21,
                                           height: 1.4,
                                           fontWeight: FontWeight.w500,
-                                          color: _recognized.isEmpty && _listening
+                                          color: _recognized.isEmpty && _isListening
                                               ? theme.colors.inkFaint
                                               : theme.colors.ink,
                                         ),
                                       ),
-                                      if (!_done && _listening)
+                                      if (_isListening)
                                         WidgetSpan(
                                           child: _Cursor(accent: theme.accent),
                                         ),
@@ -195,12 +226,12 @@ class _DictationOverlayState extends State<DictationOverlay> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Oscilloscope(active: _listening),
+                          Oscilloscope(active: _isListening),
                           const SizedBox(height: 14),
                           GestureDetector(
-                            onTap: (_done || _error.isNotEmpty) ? null : _finish,
+                            onTap: (_phase == _Phase.listening || _phase == _Phase.stopped) ? _finish : null,
                             child: AnimatedOpacity(
-                              opacity: (_done || _error.isNotEmpty) ? 0.5 : 1.0,
+                              opacity: (_phase == _Phase.listening || _phase == _Phase.stopped) ? 1.0 : 0.5,
                               duration: const Duration(milliseconds: 200),
                               child: Container(
                                 width: double.infinity,
@@ -215,7 +246,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
                                     IconCheck(size: 20, sw: 2.4, color: theme.onAccent),
                                     const SizedBox(width: 8),
                                     Text(
-                                      _done ? 'Adding\u2026' : 'Done',
+                                      _phase == _Phase.captured ? 'Adding\u2026' : 'Done',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
