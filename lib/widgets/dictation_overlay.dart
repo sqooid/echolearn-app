@@ -137,7 +137,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
                               _PulsingDot(active: _listening, accent: theme.accent),
                               const SizedBox(width: 8),
                               Text(
-                                _done ? 'Captured' : (_listening ? 'Listening · English' : 'Ready'),
+                                _done ? 'Captured' : (_listening ? 'Listening \u2022 English' : 'Ready'),
                                 style: TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 11,
@@ -173,7 +173,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
                                     else ...[
                                       TextSpan(
                                         text: _recognized.isEmpty && _listening
-                                            ? 'Start speaking…'
+                                            ? 'Start speaking\u2026'
                                             : _recognized,
                                         style: TextStyle(
                                           fontSize: 21,
@@ -215,7 +215,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
                                     IconCheck(size: 20, sw: 2.4, color: theme.onAccent),
                                     const SizedBox(width: 8),
                                     Text(
-                                      _done ? 'Adding…' : 'Done',
+                                      _done ? 'Adding\u2026' : 'Done',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
