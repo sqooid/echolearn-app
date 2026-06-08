@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../models/card.dart';
 import '../models/filter_state.dart';
@@ -38,12 +37,10 @@ class CardsViewModel extends ChangeNotifier {
   StreamSubscription<List<TranslationCard>>? _sub;
 
   CardsViewModel({
-    required CardRepository repository,
-    required SettingsRepository settings,
+    required this._repository,
+    required this._settings,
     AudioService? audio,
-  })  : _repository = repository,
-        _settings = settings,
-        _audio = audio ?? AudioService() {
+  })  : _audio = audio ?? AudioService() {
     _sub = _repository.cards.listen((cards) {
       _cards = cards;
       notifyListeners();
