@@ -552,3 +552,22 @@ class IconMinus extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LingoIcon(size: size, strokeWidth: sw, color: color, pathBuilder: _minusPath);
 }
+
+Path _editPath(Size s) => Path()
+  ..moveTo(15, 4.5)
+  ..lineTo(19.5, 9)
+  ..lineTo(11.5, 17)
+  ..lineTo(7, 17)
+  ..lineTo(7, 12.5)
+  ..close()
+  ..moveTo(13.5, 6)
+  ..lineTo(18, 10.5);
+
+class IconEdit extends StatelessWidget {
+  final double size;
+  final double sw;
+  final Color? color;
+  const IconEdit({super.key, this.size = 24, this.sw = 1.8, this.color});
+  @override
+  Widget build(BuildContext context) => LingoIcon(size: size, strokeWidth: sw, color: color, pathBuilder: _editPath);
+}

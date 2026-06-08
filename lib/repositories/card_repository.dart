@@ -142,6 +142,37 @@ class CardRepository {
     _controller.add(_cache);
   }
 
+  Future<void> editCard(TranslationCard card, String language, String newEn, String newTranslation) async {
+    final enChanged = card.en != newEn;
+    final t = card.translationFor(language);
+    final trChanged = t != null && t.text != newTranslation;
+
+    if (!enChanged && !trChanged) return;
+
+    if (enChanged) {
+      await DatabaseService.updateCard(card.copyWith(en: newEn));
+    }
+
+    if (trChanged) {
+      List<int>? audioData = t.audioData;
+      int? durationMs = t.durationMs;
+      try {
+        audioData = await _api.textToSpeech(text: newTranslation, language: _languageCode(language));
+        durationMs = (newTranslation.length * 250).clamp(1500, 30000);
+      } catch (_) {}
+
+      await DatabaseService.upsertTranslation(TranslationEntry(
+        cardId: card.id!,
+        language: language,
+        text: newTranslation,
+        audioData: audioData,
+        durationMs: durationMs,
+      ));
+    }
+
+    await _refreshCard(card.id!, language);
+  }
+
   void dispose() {
     _controller.close();
     _errorController.close();

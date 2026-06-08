@@ -360,6 +360,23 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             _Section(
+              title: 'Behavior',
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text('Confirm before delete', style: TextStyle(fontSize: 14, color: theme.colors.ink)),
+                      const Spacer(),
+                      Toggle(
+                        on: settings.confirmDelete,
+                        onChange: (v) => onChange(settings.copyWith(confirmDelete: v)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            _Section(
               title: 'API key',
               child: TextField(
                 obscureText: true,

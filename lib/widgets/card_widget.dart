@@ -212,6 +212,7 @@ class TranslationCardWidget extends StatelessWidget {
   final bool playing;
   final VoidCallback onToggle;
   final VoidCallback onPlay;
+  final VoidCallback onEdit;
   final VoidCallback onArchive;
   final VoidCallback onDelete;
   final VoidCallback onRestore;
@@ -225,6 +226,7 @@ class TranslationCardWidget extends StatelessWidget {
     required this.playing,
     required this.onToggle,
     required this.onPlay,
+    required this.onEdit,
     required this.onArchive,
     required this.onDelete,
     required this.onRestore,
@@ -395,27 +397,38 @@ class TranslationCardWidget extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Expanded(
-              child: card.archived
-                  ? ActionBtn(
+            Tooltip(
+              message: 'Delete',
+              child: _IconBtn(
+                icon: IconTrash(size: 17, color: theme.colors.ink),
+                onTap: onDelete,
+                hoverColor: theme.colors.ink,
+              ),
+            ),
+            const SizedBox(width: 8),
+            card.archived
+                ? Tooltip(
+                    message: 'Restore',
+                    child: _IconBtn(
                       icon: IconRestore(size: 17, color: theme.colors.ink),
-                      label: 'Restore',
                       onTap: onRestore,
-                    )
-                  : ActionBtn(
+                    ),
+                  )
+                : Tooltip(
+                    message: 'Archive',
+                    child: _IconBtn(
                       icon: IconArchive(size: 17, color: theme.colors.ink),
-                      label: 'Archive',
                       onTap: onArchive,
                     ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ActionBtn(
-                icon: IconTrash(size: 17, color: theme.colors.ink),
-                label: 'Delete',
-                danger: true,
-                onTap: onDelete,
+                  ),
+            const SizedBox(width: 8),
+            Tooltip(
+              message: 'Edit',
+              child: _IconBtn(
+                icon: IconEdit(size: 17, color: theme.colors.ink),
+                onTap: onEdit,
               ),
             ),
           ],
@@ -463,6 +476,390 @@ class _SpinnerState extends State<_Spinner> with SingleTickerProviderStateMixin 
         strokeWidth: 2,
         valueColor: AlwaysStoppedAnimation<Color>(widget.accent),
         backgroundColor: widget.borderStrong,
+      ),
+    );
+  }
+}
+
+class _IconBtn extends StatefulWidget {
+  final Widget icon;
+  final VoidCallback onTap;
+  final Color? hoverColor;
+
+  const _IconBtn({required this.icon, required this.onTap, this.hoverColor});
+
+  @override
+  State<_IconBtn> createState() => _IconBtnState();
+}
+
+class _IconBtnState extends State<_IconBtn> {
+  bool _hover = false;
+
+  void _setHover(bool v) {
+    if (mounted) setState(() => _hover = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => _setHover(true),
+      onTapUp: (_) => _setHover(false),
+      onTapCancel: () => _setHover(false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: const Cubic(0.32, 0.72, 0, 1),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: _hover
+              ? (widget.hoverColor ?? theme.colors.surface3)
+              : theme.colors.surface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.colors.borderStrong),
+        ),
+        child: Center(child: widget.icon),
+      ),
+    );
+  }
+}
+
+class EditCardModal extends StatefulWidget {
+  final TranslationCard card;
+  final TranslationEntry translation;
+  final ValueChanged<EditResult> onSave;
+
+  const EditCardModal({
+    super.key,
+    required this.card,
+    required this.translation,
+    required this.onSave,
+  });
+
+  @override
+  State<EditCardModal> createState() => _EditCardModalState();
+}
+
+class EditResult {
+  final String en;
+  final String translated;
+  const EditResult({required this.en, required this.translated});
+}
+
+class _EditCardModalState extends State<EditCardModal> {
+  late final TextEditingController _enController;
+  late final TextEditingController _trController;
+
+  @override
+  void initState() {
+    super.initState();
+    _enController = TextEditingController(text: widget.card.en);
+    _trController = TextEditingController(text: widget.translation.text);
+  }
+
+  @override
+  void dispose() {
+    _enController.dispose();
+    _trController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return Dialog(
+      backgroundColor: theme.colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colors.border),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Edit Card',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colors.ink,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: IconClose(size: 20, color: theme.colors.inkFaint),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _Label(text: 'English'),
+            const SizedBox(height: 6),
+            _Panel(
+              controller: _enController,
+              label: 'English phrase',
+            ),
+            const SizedBox(height: 14),
+            _Label(text: 'Translation'),
+            const SizedBox(height: 6),
+            _Panel(
+              controller: _trController,
+              label: 'Translated text',
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _ModalBtn(
+                    label: 'Cancel',
+                    onTap: () => Navigator.of(context).pop(),
+                    theme: theme,
+                    primary: false,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ModalBtn(
+                    label: 'Save',
+                    onTap: () {
+                      final result = EditResult(
+                        en: _enController.text.trim(),
+                        translated: _trController.text.trim(),
+                      );
+                      widget.onSave(result);
+                      Navigator.of(context).pop();
+                    },
+                    theme: theme,
+                    primary: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return Text(
+      text,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 11,
+        letterSpacing: 0.88,
+        color: theme.colors.inkSoft,
+      ),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+
+  const _Panel({required this.controller, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colors.surface2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colors.borderStrong),
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: 3,
+        style: TextStyle(
+          fontSize: 16,
+          height: 1.45,
+          fontWeight: FontWeight.w500,
+          color: theme.colors.ink,
+        ),
+        decoration: InputDecoration(
+          hintText: label,
+          hintStyle: TextStyle(color: theme.colors.inkFaint, fontSize: 16),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+}
+
+class _ModalBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final LingoTheme theme;
+  final bool primary;
+
+  const _ModalBtn({
+    required this.label,
+    required this.onTap,
+    required this.theme,
+    required this.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: primary ? theme.accent : theme.colors.surface2,
+          borderRadius: BorderRadius.circular(10),
+          border: primary ? null : Border.all(color: theme.colors.borderStrong),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: primary ? theme.onAccent : theme.colors.ink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ConfirmDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final bool danger;
+  final VoidCallback onConfirm;
+
+  const ConfirmDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    this.danger = false,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return Dialog(
+      backgroundColor: theme.colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colors.border),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: theme.colors.ink,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: theme.colors.inkSoft,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _DialogBtn(
+                    label: 'Cancel',
+                    onTap: () => Navigator.of(context).pop(),
+                    theme: theme,
+                    primary: false,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _DialogBtn(
+                    label: confirmLabel,
+                    onTap: () {
+                      onConfirm();
+                      Navigator.of(context).pop();
+                    },
+                    theme: theme,
+                    primary: true,
+                    danger: danger,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final LingoTheme theme;
+  final bool primary;
+  final bool danger;
+
+  const _DialogBtn({
+    required this.label,
+    required this.onTap,
+    required this.theme,
+    this.primary = false,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: primary ? (danger ? const Color(0xFFDC2626) : theme.accent) : theme.colors.surface2,
+          borderRadius: BorderRadius.circular(10),
+          border: primary ? null : Border.all(color: theme.colors.borderStrong),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: primary ? Colors.white : theme.colors.ink,
+            ),
+          ),
+        ),
       ),
     );
   }

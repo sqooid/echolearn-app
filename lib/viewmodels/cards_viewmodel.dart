@@ -134,6 +134,10 @@ class CardsViewModel extends ChangeNotifier {
     _expandedId = null;
   }
 
+  void editCard(TranslationCard card, TranslationEntry translation, String newEn, String newTranslation) {
+    _repository.editCard(card, _lang, newEn, newTranslation);
+  }
+
   void playOne(TranslationCard card, TranslationEntry translation) {
     if (_speakingId == card.id) {
       _stopAll();

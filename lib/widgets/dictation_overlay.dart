@@ -97,7 +97,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
   }
 
   void _finish() {
-    if (_phase != _Phase.listening && _phase != _Phase.stopped && _phase != _Phase.editing) return;
+    if (_phase == _Phase.captured || _phase == _Phase.error) return;
     final wasEditing = _phase == _Phase.editing;
     setState(() => _phase = _Phase.captured);
     _speech.stop();
@@ -109,25 +109,29 @@ class _DictationOverlayState extends State<DictationOverlay> {
   }
 
   void _onTextTap(TapDownDetails details) {
-    if (_phase != _Phase.listening && _phase != _Phase.stopped) return;
-    if (_recognized.isEmpty) return;
+    if (_phase == _Phase.captured || _phase == _Phase.error) return;
     _speech.stop();
-    final renderBox = _textKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    final localOffset = renderBox.globalToLocal(details.globalPosition);
-    final textStyle = TextStyle(
-      fontSize: 21,
-      height: 1.4,
-      fontWeight: FontWeight.w500,
-      color: LingoTheme.of(context).colors.ink,
-    );
-    final textPainter = TextPainter(
-      text: TextSpan(text: _recognized, style: textStyle),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: renderBox.size.width);
-    final textPosition = textPainter.getPositionForOffset(localOffset);
     _editController.text = _recognized;
-    _editController.selection = TextSelection.collapsed(offset: textPosition.offset);
+    if (_recognized.isNotEmpty) {
+      final renderBox = _textKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null) {
+        final localOffset = renderBox.globalToLocal(details.globalPosition);
+        final textStyle = TextStyle(
+          fontSize: 21,
+          height: 1.4,
+          fontWeight: FontWeight.w500,
+          color: LingoTheme.of(context).colors.ink,
+        );
+        final textPainter = TextPainter(
+          text: TextSpan(text: _recognized, style: textStyle),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: renderBox.size.width);
+        final textPosition = textPainter.getPositionForOffset(localOffset);
+        _editController.selection = TextSelection.collapsed(offset: textPosition.offset);
+      }
+    } else {
+      _editController.selection = const TextSelection.collapsed(offset: 0);
+    }
     setState(() => _phase = _Phase.editing);
     _focusNode.requestFocus();
   }
@@ -167,8 +171,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
   }
 
   bool get _isListening => _phase == _Phase.listening;
-  bool get _canFinish =>
-      _phase == _Phase.listening || _phase == _Phase.stopped || _phase == _Phase.editing;
+  bool get _canFinish => _phase != _Phase.captured && _phase != _Phase.error;
 
   @override
   Widget build(BuildContext context) {

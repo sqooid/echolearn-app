@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'models/card.dart';
 import 'utils/theme.dart';
 import 'viewmodels/cards_viewmodel.dart';
 import 'viewmodels/settings_viewmodel.dart';
@@ -46,6 +47,53 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
       offset.clamp(0.0, maxScroll),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
+    );
+  }
+
+  void _deleteCard(BuildContext context, TranslationCard card, CardsViewModel cardsVm, SettingsViewModel settingsVm) {
+    if (!settingsVm.settings.confirmDelete) {
+      cardsVm.deleteCard(card);
+      return;
+    }
+    final theme = LingoTheme.of(context);
+    showDialog(
+      context: context,
+      builder: (_) => LingoTheme(
+        colors: theme.colors,
+        accent: theme.accent,
+        onAccent: theme.onAccent,
+        density: theme.density,
+        gap: theme.gap,
+        child: ConfirmDialog(
+          title: 'Delete card?',
+          message: '"${card.en}" will be permanently removed.',
+          confirmLabel: 'Delete',
+          danger: true,
+          onConfirm: () => cardsVm.deleteCard(card),
+        ),
+      ),
+    );
+  }
+
+  void _showEditModal(BuildContext context, TranslationCard card, TranslationEntry translation, CardsViewModel cardsVm) {
+    final theme = LingoTheme.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => LingoTheme(
+        colors: theme.colors,
+        accent: theme.accent,
+        onAccent: theme.onAccent,
+        density: theme.density,
+        gap: theme.gap,
+        child: EditCardModal(
+          card: card,
+          translation: translation,
+          onSave: (result) {
+            cardsVm.editCard(card, translation, result.en, result.translated);
+          },
+        ),
+      ),
     );
   }
 
@@ -117,8 +165,9 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
                               playing: cardsVm.speakingId == card.id,
                               onToggle: () => cardsVm.toggleExpand(card.id),
                               onPlay: () => cardsVm.playOne(card, t!),
+                              onEdit: () => _showEditModal(context, card, t!, cardsVm),
                               onArchive: () => cardsVm.archiveCard(card),
-                              onDelete: () => cardsVm.deleteCard(card),
+                              onDelete: () => _deleteCard(context, card, cardsVm, settingsVm),
                               onRestore: () => cardsVm.restoreCard(card),
                             ),
                           );
