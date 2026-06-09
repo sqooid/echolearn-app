@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
 import '../utils/theme.dart';
 import 'icons.dart';
@@ -400,6 +401,22 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            Center(
+              child: GestureDetector(
+                onTap: () => launchUrl(
+                  Uri.parse('https://github.com/sqooid/echolearn-app/issues/new'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text(
+                  'Send feedback \u2192',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colors.inkSoft,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
             Center(
               child: FutureBuilder<PackageInfo>(
               future: PackageInfo.fromPlatform(),
