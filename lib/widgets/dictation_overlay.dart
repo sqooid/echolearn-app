@@ -25,6 +25,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
   final _textKey = GlobalKey();
   final _focusNode = FocusNode();
   final _editController = TextEditingController();
+  final _scrollController = ScrollController();
   String _recognized = '';
   _Phase _phase = _Phase.warming;
   String _error = '';
@@ -39,8 +40,11 @@ class _DictationOverlayState extends State<DictationOverlay> {
     final available = await _speech.initialize(
       onError: (error) {
         if (!mounted) return;
-        if (error.errorMsg == 'error_no_match' || error.errorMsg == 'error_speech_timeout') {
-          if (_phase == _Phase.warming || _phase == _Phase.listening || _phase == _Phase.stopped) {
+        if (error.errorMsg == 'error_no_match' ||
+            error.errorMsg == 'error_speech_timeout') {
+          if (_phase == _Phase.warming ||
+              _phase == _Phase.listening ||
+              _phase == _Phase.stopped) {
             setState(() => _phase = _Phase.stopped);
           }
           return;
@@ -86,6 +90,7 @@ class _DictationOverlayState extends State<DictationOverlay> {
         setState(() {
           _recognized = result.recognizedWords;
         });
+        _scrollToBottom();
       },
       listenOptions: stt.SpeechListenOptions(
         autoPunctuation: true,
@@ -113,9 +118,14 @@ class _DictationOverlayState extends State<DictationOverlay> {
     _speech.stop();
     _editController.text = _recognized;
     if (_recognized.isNotEmpty) {
-      final renderBox = _textKey.currentContext?.findRenderObject() as RenderBox?;
+      final renderBox =
+          _textKey.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox != null) {
         final localOffset = renderBox.globalToLocal(details.globalPosition);
+        final scrollOffset = _scrollController.hasClients
+            ? _scrollController.offset
+            : 0.0;
+        final adjustedOffset = localOffset + Offset(0, scrollOffset);
         final textStyle = TextStyle(
           fontSize: 21,
           height: 1.4,
@@ -126,30 +136,48 @@ class _DictationOverlayState extends State<DictationOverlay> {
           text: TextSpan(text: _recognized, style: textStyle),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: renderBox.size.width);
-        final textPosition = textPainter.getPositionForOffset(localOffset);
-        _editController.selection = TextSelection.collapsed(offset: textPosition.offset);
+        final textPosition = textPainter.getPositionForOffset(adjustedOffset);
+        _editController.selection = TextSelection.collapsed(
+          offset: textPosition.offset,
+        );
       }
     } else {
       _editController.selection = const TextSelection.collapsed(offset: 0);
+    }
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
     }
     setState(() => _phase = _Phase.editing);
     _focusNode.requestFocus();
   }
 
   TextStyle get _textStyle => TextStyle(
-        fontSize: 21,
-        height: 1.4,
-        fontWeight: FontWeight.w500,
-        color: _recognized.isEmpty && _phase == _Phase.listening
-            ? LingoTheme.of(context).colors.inkFaint
-            : LingoTheme.of(context).colors.ink,
-      );
+    fontSize: 21,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
+    color: _recognized.isEmpty && _phase == _Phase.listening
+        ? LingoTheme.of(context).colors.inkFaint
+        : LingoTheme.of(context).colors.ink,
+  );
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
     _speech.stop();
     _focusNode.dispose();
     _editController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -176,159 +204,227 @@ class _DictationOverlayState extends State<DictationOverlay> {
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
+    final safeTop = MediaQuery.of(context).padding.top;
+    const topClearance = 12.0;
+    const panelPadV = 20.0 + 18.0;
+    const statusRowH = 24.0;
+    const gap1 = 14.0;
+    const gap2 = 6.0;
+    const oscH = 64.0;
+    const gap3 = 14.0;
+    const btnH = 52.0;
+    const fixedV = panelPadV + statusRowH + gap1 + gap2 + oscH + gap3 + btnH;
+
     return Positioned.fill(
-      child: GestureDetector(
-        onTap: widget.onCancel,
-        child: Container(
-          color: const Color(0x6B141416),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.15),
-                ),
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.end,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableHeight = constraints.maxHeight;
+          final keyboardOpen = (MediaQuery.of(context).size.height - availableHeight) > 100;
+          final maxBottomPad = keyboardOpen ? 12.0 : 96.0;
+          final maxPanelHeight = (availableHeight - safeTop - topClearance)
+              .clamp(0.0, double.infinity);
+          final bottomPad = (maxPanelHeight - fixedV - 64.0).clamp(
+            0.0,
+            maxBottomPad,
+          );
+          final maxTextHeight = (maxPanelHeight - bottomPad - fixedV).clamp(
+            64.0,
+            double.infinity,
+          );
+
+          return GestureDetector(
+            onTap: widget.onCancel,
+            child: Container(
+              color: const Color(0x6B141416),
+              child: Stack(
                 children: [
-                  GestureDetector(
-                    onTap: () {},
+                  Positioned.fill(
                     child: Container(
-                      margin: const EdgeInsets.fromLTRB(14, 0, 14, 96),
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                      decoration: BoxDecoration(
-                        color: theme.colors.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: theme.colors.border),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x2E000000),
-                            blurRadius: 40,
-                            offset: Offset(0, 12),
+                      color: Colors.black.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GestureDetector(
+                        onTap: () {},
+                        child: Container(
+                          margin: EdgeInsets.fromLTRB(14, 0, 14, bottomPad),
+                          constraints: BoxConstraints(
+                            maxHeight: maxPanelHeight,
                           ),
-                          BoxShadow(
-                            color: Color(0x1A000000),
-                            blurRadius: 12,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _PulsingDot(active: _isListening, accent: theme.accent),
-                              const SizedBox(width: 8),
-                              Text(
-                                _statusText,
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 11,
-                                  letterSpacing: 0.88,
-                                  color: theme.colors.inkSoft,
-                                ),
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                          decoration: BoxDecoration(
+                            color: theme.colors.surface,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: theme.colors.border),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x2E000000),
+                                blurRadius: 40,
+                                offset: Offset(0, 12),
                               ),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: widget.onCancel,
-                                child: IconClose(size: 20, color: theme.colors.inkFaint),
+                              BoxShadow(
+                                color: Color(0x1A000000),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 14),
-                          GestureDetector(
-                            onTapDown: _onTextTap,
-                            child: SizedBox(
-                              key: _textKey,
-                              height: 64,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: _phase == _Phase.editing
-                                    ? TextField(
-                                        controller: _editController,
-                                        focusNode: _focusNode,
-                                        style: _textStyle,
-                                        decoration: const InputDecoration(
-                                          border: InputBorder.none,
-                                          isDense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                        ),
-                                        maxLines: 3,
-                                      )
-                                    : Text.rich(
-                                        TextSpan(
-                                          children: [
-                                            if (_phase == _Phase.error)
-                                              TextSpan(
-                                                text: _error,
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  height: 1.4,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: theme.colors.inkFaint,
-                                                ),
-                                              )
-                                            else ...[
-                                              TextSpan(
-                                                text: _recognized.isEmpty && _isListening
-                                                    ? 'Start speaking\u2026'
-                                                    : _recognized,
-                                                style: _textStyle,
-                                              ),
-                                              if (_isListening)
-                                                WidgetSpan(
-                                                  child: _Cursor(accent: theme.accent),
-                                                ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  _PulsingDot(
+                                    active: _isListening,
+                                    accent: theme.accent,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _statusText,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      letterSpacing: 0.88,
+                                      color: theme.colors.inkSoft,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  GestureDetector(
+                                    onTap: widget.onCancel,
+                                    child: IconClose(
+                                      size: 20,
+                                      color: theme.colors.inkFaint,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Oscilloscope(active: _isListening),
-                          const SizedBox(height: 14),
-                          GestureDetector(
-                            onTap: _canFinish ? _finish : null,
-                            child: AnimatedOpacity(
-                              opacity: _canFinish ? 1.0 : 0.5,
-                              duration: const Duration(milliseconds: 200),
-                              child: Container(
-                                width: double.infinity,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  color: theme.accent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconCheck(size: 20, sw: 2.4, color: theme.onAccent),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _phase == _Phase.captured ? 'Adding\u2026' : 'Done',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.onAccent,
+                              const SizedBox(height: 14),
+                              if (_phase == _Phase.editing)
+                                ConstrainedBox(
+                                  key: _textKey,
+                                  constraints: BoxConstraints(
+                                    minHeight: 64,
+                                    maxHeight: maxTextHeight,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.topLeft,
+                                    child: TextField(
+                                      controller: _editController,
+                                      focusNode: _focusNode,
+                                      style: _textStyle,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                      maxLines: null,
+                                    ),
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTapDown: _onTextTap,
+                                  child: ConstrainedBox(
+                                    key: _textKey,
+                                    constraints: BoxConstraints(
+                                      minHeight: 64,
+                                      maxHeight: maxTextHeight,
+                                    ),
+                                    child: SingleChildScrollView(
+                                      controller: _scrollController,
+                                      child: Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              if (_phase == _Phase.error)
+                                                TextSpan(
+                                                  text: _error,
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    height: 1.4,
+                                                    fontWeight: FontWeight.w500,
+                                                    color:
+                                                        theme.colors.inkFaint,
+                                                  ),
+                                                )
+                                              else ...[
+                                                TextSpan(
+                                                  text:
+                                                      _recognized.isEmpty &&
+                                                          _isListening
+                                                      ? 'Start speaking\u2026'
+                                                      : _recognized,
+                                                  style: _textStyle,
+                                                ),
+                                                if (_isListening)
+                                                  WidgetSpan(
+                                                    child: _Cursor(
+                                                      accent: theme.accent,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                ),
+                              const SizedBox(height: 6),
+                              Oscilloscope(active: _isListening),
+                              const SizedBox(height: 14),
+                              GestureDetector(
+                                onTap: _canFinish ? _finish : null,
+                                child: AnimatedOpacity(
+                                  opacity: _canFinish ? 1.0 : 0.5,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      color: theme.accent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        IconCheck(
+                                          size: 20,
+                                          sw: 2.4,
+                                          color: theme.onAccent,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _phase == _Phase.captured
+                                              ? 'Adding\u2026'
+                                              : 'Done',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: theme.onAccent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -344,7 +440,8 @@ class _PulsingDot extends StatefulWidget {
   State<_PulsingDot> createState() => _PulsingDotState();
 }
 
-class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderStateMixin {
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -380,10 +477,7 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
       return Container(
         width: 8,
         height: 8,
-        decoration: BoxDecoration(
-          color: widget.accent,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: widget.accent, shape: BoxShape.circle),
       );
     }
     return AnimatedBuilder(

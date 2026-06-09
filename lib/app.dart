@@ -115,6 +115,7 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
+        resizeToAvoidBottomInset: true,
         backgroundColor: colors.screen,
         body: Builder(
           builder: (context) {
@@ -131,12 +132,12 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
             });
 
             return LingoTheme(
-              colors: colors,
-              accent: accent,
-              onAccent: onAccent,
-              density: density,
-              gap: gap,
-              child: Stack(
+                colors: colors,
+                accent: accent,
+                onAccent: onAccent,
+                density: density,
+                gap: gap,
+                child: Stack(
                 children: [
                   if (_page == 'main') ...[
                     if (view.isEmpty)
