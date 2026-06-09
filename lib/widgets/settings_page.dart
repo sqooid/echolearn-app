@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/settings.dart';
 import '../utils/theme.dart';
 import 'icons.dart';
@@ -400,15 +401,21 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Center(
-              child: Text(
-                'EchoLearn · v0.1',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  letterSpacing: 0.55,
-                  color: theme.colors.inkFaint,
-                ),
-              ),
+              child: FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, snapshot) {
+                final version = snapshot.data?.version ?? '0.1';
+                return Text(
+                  'EchoLearn · v$version',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    letterSpacing: 0.55,
+                    color: theme.colors.inkFaint,
+                  ),
+                );
+              },
+            ),
             ),
           ],
         ),
