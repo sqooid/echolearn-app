@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:io';
 import '../models/card.dart';
 import '../models/settings.dart';
 
@@ -24,10 +25,26 @@ class DatabaseService {
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
-          await db.execute('DROP TABLE IF EXISTS cards');
-          await db.execute('DROP TABLE IF EXISTS settings');
-          await _createTables(db);
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS translations (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              card_id INTEGER NOT NULL,
+              language TEXT NOT NULL,
+              text TEXT NOT NULL,
+              audio_data BLOB,
+              duration_ms INTEGER,
+              FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+            )
+          ''');
+          try { await db.execute('ALTER TABLE cards ADD COLUMN plays INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+          try { await db.execute('ALTER TABLE cards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
         }
+      },
+      onDowngrade: (db, oldVersion, newVersion) async {
+        await db.execute('DROP TABLE IF EXISTS cards');
+        await db.execute('DROP TABLE IF EXISTS translations');
+        await db.execute('DROP TABLE IF EXISTS settings');
+        await _createTables(db);
       },
     );
   }
@@ -224,5 +241,20 @@ class DatabaseService {
     await setSetting('apiKey', settings.apiKey);
     await setSetting('confirmDelete', settings.confirmDelete.toString());
     await setSetting('scrollToPlaying', settings.scrollToPlaying.toString());
+  }
+
+  static Future<void> close() async {
+    if (_db != null) {
+      await _db!.close();
+      _db = null;
+    }
+  }
+
+  static Future<void> importBackup(String sourcePath) async {
+    await close();
+    final dbPath = await getDatabasesPath();
+    final targetPath = join(dbPath, 'echolearn.db');
+    final source = File(sourcePath);
+    await source.copy(targetPath);
   }
 }

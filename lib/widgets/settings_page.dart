@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
 import '../utils/theme.dart';
+import '../viewmodels/cards_viewmodel.dart';
+import '../viewmodels/settings_viewmodel.dart';
+import '../services/backup_service.dart';
 import 'icons.dart';
 import 'filter_bar.dart';
 
@@ -385,6 +389,53 @@ class SettingsPage extends StatelessWidget {
                         onChange: (v) => onChange(settings.copyWith(scrollToPlaying: v)),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            _Section(
+              title: 'Backup & Restore',
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => BackupService.exportBackup(),
+                      icon: Icon(Icons.upload, size: 18, color: theme.colors.ink),
+                      label: Text('Export backup', style: TextStyle(fontSize: 14, color: theme.colors.ink)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: theme.colors.borderStrong),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final path = await BackupService.pickBackupFile();
+                        if (path == null) return;
+                        await BackupService.restoreBackup(path);
+                        if (!context.mounted) return;
+                        final cardsVm = context.read<CardsViewModel>();
+                        final settingsVm = context.read<SettingsViewModel>();
+                        await settingsVm.load();
+                        cardsVm.repository.setApiKey(settingsVm.settings.apiKey);
+                        await cardsVm.load();
+                        onChange(settingsVm.settings);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Backup restored')),
+                        );
+                      },
+                      icon: Icon(Icons.download, size: 18, color: theme.colors.ink),
+                      label: Text('Restore backup', style: TextStyle(fontSize: 14, color: theme.colors.ink)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: theme.colors.borderStrong),
+                      ),
+                    ),
                   ),
                 ],
               ),
