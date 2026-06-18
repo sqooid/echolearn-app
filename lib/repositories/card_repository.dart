@@ -96,6 +96,20 @@ class CardRepository {
     }
   }
 
+  Future<void> repairCardAudio(TranslationCard card, String language) async {
+    final t = card.translationFor(language);
+    if (t == null || t.audioData == null) return;
+    await DatabaseService.upsertTranslation(TranslationEntry(
+      cardId: card.id!,
+      language: language,
+      text: t.text,
+      audioData: null,
+      durationMs: null,
+    ));
+    await _refreshCard(card.id!, language);
+    processCard(card, language);
+  }
+
   Future<void> _refreshCard(int cardId, String language) async {
     final updated = await DatabaseService.getCardWithTranslation(cardId, language);
     if (updated == null) return;

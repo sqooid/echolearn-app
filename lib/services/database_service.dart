@@ -200,6 +200,7 @@ class DatabaseService {
     final delayAddClip = (await getSetting('delayAddClip') ?? 'false') == 'true';
     final apiKey = await getSetting('apiKey') ?? '';
     final confirmDelete = (await getSetting('confirmDelete') ?? 'true') == 'true';
+    final scrollToPlaying = (await getSetting('scrollToPlaying') ?? 'false') == 'true';
     return AppSettings(
       lang: lang,
       theme: theme,
@@ -209,6 +210,7 @@ class DatabaseService {
       delayAddClip: delayAddClip,
       apiKey: apiKey,
       confirmDelete: confirmDelete,
+      scrollToPlaying: scrollToPlaying,
     );
   }
 
@@ -221,5 +223,6 @@ class DatabaseService {
     await setSetting('delayAddClip', settings.delayAddClip.toString());
     await setSetting('apiKey', settings.apiKey);
     await setSetting('confirmDelete', settings.confirmDelete.toString());
+    await setSetting('scrollToPlaying', settings.scrollToPlaying.toString());
   }
 }

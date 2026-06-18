@@ -26,6 +26,7 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<String>? _errorSub;
   static const double _kItemEstimate = 160;
+  int? _lastCurrentId;
 
   @override
   void dispose() {
@@ -35,9 +36,11 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
   }
 
   void _scrollToIndex(int index, {String align = 'start'}) {
+    if (!_scrollController.hasClients) return;
     final settings = context.read<SettingsViewModel>().settings;
     final gap = gapPixels(settings.spacing);
-    var offset = index * (_kItemEstimate + gap);
+    final topPadding = MediaQuery.of(context).padding.top + 74 + gap;
+    var offset = topPadding + index * (_kItemEstimate + gap);
     if (align == 'center') {
       final viewport = _scrollController.position.viewportDimension;
       offset = offset - viewport / 2 + _kItemEstimate / 2;
@@ -130,6 +133,18 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
                 SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
               );
             });
+
+            if (cardsVm.listPlaying && settings.scrollToPlaying && cardsVm.currentId != null && cardsVm.currentId != _lastCurrentId) {
+              _lastCurrentId = cardsVm.currentId;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                final idx = cardsVm.currentPlayIndex;
+                if (idx >= 0) _scrollToIndex(idx, align: 'center');
+              });
+            }
+            if (!cardsVm.listPlaying) {
+              _lastCurrentId = null;
+            }
 
             return LingoTheme(
                 colors: colors,

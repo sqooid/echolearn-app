@@ -44,6 +44,7 @@ class AppSettings {
   final bool delayAddClip;
   final String apiKey;
   final bool confirmDelete;
+  final bool scrollToPlaying;
 
   const AppSettings({
     this.lang = 'jp',
@@ -54,6 +55,7 @@ class AppSettings {
     this.delayAddClip = false,
     this.apiKey = '',
     this.confirmDelete = true,
+    this.scrollToPlaying = false,
   });
 
   AppSettings copyWith({
@@ -65,6 +67,7 @@ class AppSettings {
     bool? delayAddClip,
     String? apiKey,
     bool? confirmDelete,
+    bool? scrollToPlaying,
   }) {
     return AppSettings(
       lang: lang ?? this.lang,
@@ -75,6 +78,7 @@ class AppSettings {
       delayAddClip: delayAddClip ?? this.delayAddClip,
       apiKey: apiKey ?? this.apiKey,
       confirmDelete: confirmDelete ?? this.confirmDelete,
+      scrollToPlaying: scrollToPlaying ?? this.scrollToPlaying,
     );
   }
 }

@@ -159,6 +159,10 @@ class CardsViewModel extends ChangeNotifier {
         _speakingId = null;
         notifyListeners();
       }
+    }, () {
+      _repository.repairCardAudio(card, _lang);
+      _speakingId = null;
+      notifyListeners();
     });
   }
 
@@ -245,16 +249,31 @@ class CardsViewModel extends ChangeNotifier {
         notifyListeners();
         _playStep(i + 1, token);
       });
+    }, () {
+      if (_playToken != token) return;
+      _speakingId = null;
+      _currentId = null;
+      _repository.repairCardAudio(card, _lang);
+      notifyListeners();
+      _playStep(i + 1, token);
     });
   }
 
   StreamSubscription<void>? _completeSub;
+  StreamSubscription<void>? _audioErrorSub;
 
-  void _playAndWait(int token, List<int> audioData, VoidCallback onDone) {
+  void _playAndWait(int token, List<int> audioData, VoidCallback onDone, VoidCallback onError) {
     _completeSub?.cancel();
+    _audioErrorSub?.cancel();
     _completeSub = _audio.onComplete.listen((_) {
       _completeSub?.cancel();
+      _audioErrorSub?.cancel();
       onDone();
+    });
+    _audioErrorSub = _audio.onPlaybackError.listen((_) {
+      _completeSub?.cancel();
+      _audioErrorSub?.cancel();
+      onError();
     });
     _audio.playBytes(Uint8List.fromList(audioData));
   }
@@ -276,6 +295,7 @@ class CardsViewModel extends ChangeNotifier {
   void _stopAllInternal() {
     _playToken++;
     _completeSub?.cancel();
+    _audioErrorSub?.cancel();
     _audio.stop();
     _listPlaying = false;
     _speakingId = null;

@@ -375,6 +375,17 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text('Scroll to currently playing card', style: TextStyle(fontSize: 14, color: theme.colors.ink)),
+                      const Spacer(),
+                      Toggle(
+                        on: settings.scrollToPlaying,
+                        onChange: (v) => onChange(settings.copyWith(scrollToPlaying: v)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
