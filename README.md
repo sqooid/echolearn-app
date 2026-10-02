@@ -2,16 +2,18 @@
 
 A mobile language-learning app for dictation, translation, and spaced listening practice. Built with Flutter.
 
-> **v0.1 — Prerelease** · Expect rough edges. See the [release notes](https://github.com/anomalyco/lang-app/releases/tag/v0.1).
+> **v0.3.0** · Early development — expect rough edges. See the [release notes](https://github.com/sqooid/echolearn-app/releases/tag/v0.3.0).
 
 ## Features
 
 - **Dictation** — Speak a phrase in English; speech-to-text captures your words live.
-- **Auto-translation** — Dictated phrases are sent to a configurable API for translation.
+- **Multi-language translations** — Translate into Japanese, Korean, or Mandarin Chinese and keep each language side by side. Switch languages from Settings; switching marks the cards that are missing the new language as untranslated so they can be translated on demand.
+- **On-demand translation** — Translate a whole missing set at once from Settings ("Translate N cards"), or a single card from its own Translate button.
 - **TTS audio** — Synthesized audio for each translation, stored locally for offline playback.
-- **Playback queue** — Play all cards sequentially with configurable shadowing delays. Pause/resume preserves position; a reset button restarts from the beginning.
-- **Card management** — Archive, restore, delete. Expand for metadata. Search, filter (active / all / archived), and sort by newest, oldest, A–Z, Z–A, or shuffle.
-- **Theme & layout** — Light/dark themes, accent colors (monochrome, blue, amber, green), and card density presets (compact, cozy, spacious).
+- **Playback queue** — Play all cards sequentially with configurable shadowing delays. Pause/resume preserves position; a reset button restarts from the beginning. Untranslated cards are skipped.
+- **Card management** — Archive, restore, edit, and delete. Expand a card for metadata. Delete a single card's translation for the current language without losing the others. Search, filter (Active / All / Archived, plus a show-untranslated toggle), and sort by newest, oldest, A–Z, Z–A, or shuffle.
+- **Backup & restore** — Export the whole database to a file and restore it later, using non-destructive schema migrations.
+- **Theme & layout** — Light/dark themes, accent colors (Mono, Blue, Amber, Green), and card density presets (compact, cozy, spacious).
 - **Persistent storage** — SQLite database for cards, translations, audio blobs, and settings. Pending cards retry automatically on next launch.
 - **Configurable API** — Base URL via `--dart-define=API_BASE_URL=...`, API key stored in settings.
 
@@ -39,7 +41,8 @@ A mobile language-learning app for dictation, translation, and spaced listening 
 # Clone and install dependencies
 flutter pub get
 
-# Run with a custom API server (defaults to http://localhost:8787)
+# Run against a custom API server
+# (debug builds default to a local dev server; release builds use https://echolearn-api.thesqooid.com)
 flutter run --dart-define=API_BASE_URL=http://your-server:8787
 ```
 
@@ -48,7 +51,7 @@ flutter run --dart-define=API_BASE_URL=http://your-server:8787
 Debug builds use a `.debug` application ID suffix so they can coexist with the release build on the same device.
 
 ```bash
-# Debug (installs as com.example.lang_app.debug on Android)
+# Debug (installs as com.sqooid.echolearn.debug on Android)
 flutter run
 
 # Release
