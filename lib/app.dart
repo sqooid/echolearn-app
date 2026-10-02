@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'models/card.dart';
 import 'utils/theme.dart';
@@ -115,8 +116,18 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
     final gap = gapPixels(settings.spacing);
     final view = cardsVm.view;
 
+    final overlayStyle = (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: colors.screen,
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: child!,
+      ),
       home: Scaffold(
         resizeToAvoidBottomInset: true,
         backgroundColor: colors.screen,
