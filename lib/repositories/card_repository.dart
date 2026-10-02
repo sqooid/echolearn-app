@@ -10,6 +10,10 @@ class CardRepository {
       StreamController<List<TranslationCard>>.broadcast();
   final StreamController<String> _errorController =
       StreamController<String>.broadcast();
+  final List<_ProcessJob> _processQueue = [];
+  int _activeProcesses = 0;
+
+  static const int _maxConcurrentProcesses = 16;
 
   CardRepository({ApiService? api}) : _api = api ?? ApiService();
 
@@ -28,10 +32,34 @@ class CardRepository {
 
   void _processPending(String language) {
     for (final card in _cache) {
-      if (!card.isReadyFor(language)) {
+      if (card.needsTranslation(language)) {
         processCard(card, language);
       }
     }
+  }
+
+  Future<void> changeLanguage(String language) async {
+    await DatabaseService.tombstoneMissingTranslations(language);
+    await load(language);
+  }
+
+  Future<void> translateCard(TranslationCard card, String language) async {
+    await DatabaseService.clearTombstone(card.id!, language);
+    // Surface the loading state immediately: the card is no longer tombstoned
+    // (untranslated) but has no translation yet, so the card shows its
+    // "translating" state instead of staying on the Translate button.
+    await _refreshCard(card.id!, language);
+    await processCard(card, language, prioritize: true);
+  }
+
+  Future<void> translateMissing(String language) async {
+    await DatabaseService.clearTombstones(language);
+    await load(language);
+  }
+
+  Future<void> deleteTranslation(TranslationCard card, String language) async {
+    await DatabaseService.setTombstone(card.id!, language);
+    await _refreshCard(card.id!, language);
   }
 
   Future<TranslationCard> addCard(String enText) async {
@@ -49,7 +77,35 @@ class CardRepository {
     return inserted;
   }
 
-  Future<void> processCard(TranslationCard card, String language) async {
+  /// Queues a card for translation/TTS. At most [_maxConcurrentProcesses] cards
+  /// run concurrently, so no more than that many translate/TTS requests are ever
+  /// in flight. [prioritize] jumps the queue for user-initiated work.
+  Future<void> processCard(TranslationCard card, String language, {bool prioritize = false}) {
+    final completer = Completer<void>();
+    final job = _ProcessJob(card, language, completer);
+    if (prioritize) {
+      _processQueue.insert(0, job);
+    } else {
+      _processQueue.add(job);
+    }
+    _pumpProcessQueue();
+    return completer.future;
+  }
+
+  void _pumpProcessQueue() {
+    while (_activeProcesses < _maxConcurrentProcesses && _processQueue.isNotEmpty) {
+      final job = _processQueue.removeAt(0);
+      _activeProcesses++;
+      _processCard(job.card, job.language).whenComplete(() {
+        _activeProcesses--;
+        job.completer.complete();
+        _pumpProcessQueue();
+      });
+    }
+  }
+
+  Future<void> _processCard(TranslationCard card, String language) async {
+    if (!_cache.any((c) => c.id == card.id)) return;
     try {
       final existing = card.translationFor(language);
 
@@ -107,7 +163,7 @@ class CardRepository {
       durationMs: null,
     ));
     await _refreshCard(card.id!, language);
-    processCard(card, language);
+    processCard(card, language, prioritize: true);
   }
 
   Future<void> _refreshCard(int cardId, String language) async {
@@ -188,18 +244,30 @@ class CardRepository {
   }
 
   void dispose() {
+    for (final job in _processQueue) {
+      if (!job.completer.isCompleted) job.completer.complete();
+    }
+    _processQueue.clear();
     _controller.close();
     _errorController.close();
   }
 }
 
+class _ProcessJob {
+  final TranslationCard card;
+  final String language;
+  final Completer<void> completer;
+
+  const _ProcessJob(this.card, this.language, this.completer);
+}
+
 String _languageCode(String settingLang) {
-  // Map settings key to API language code for TTS/translate calls
+  // Map settings key to API language code for TTS/translate calls.
+  // Must be a BCP-47 code the server accepts: ja, ko, zh-Hans (Mandarin).
   switch (settingLang) {
     case 'jp': return 'ja';
     case 'ko': return 'ko';
     case 'zh': return 'zh-Hans';
-    case 'es': return 'es';
     default: return 'ja';
   }
 }

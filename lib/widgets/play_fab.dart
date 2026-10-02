@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../utils/theme.dart';
 import 'icons.dart';
 
+/// Shared PlayFAB geometry, used to keep other floating UI clear of it.
+const double kPlayFabRight = 18;
+const double kPlayFabBottom = 92;
+const double kPlayFabDiameter = 56;
+
 class PlayFAB extends StatelessWidget {
   final bool playing;
   final bool isPaused;
@@ -24,8 +29,8 @@ class PlayFAB extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
     return Positioned(
-      right: 18,
-      bottom: 92,
+      right: kPlayFabRight,
+      bottom: kPlayFabBottom,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -86,7 +91,7 @@ class _FabButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 56, height: 56,
+        width: kPlayFabDiameter, height: kPlayFabDiameter,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
@@ -104,20 +109,33 @@ class _FabButton extends StatelessWidget {
 
 class EmptyState extends StatelessWidget {
   final String query;
-  const EmptyState({super.key, required this.query});
+  final bool hiddenUntranslated;
+  const EmptyState({super.key, required this.query, this.hiddenUntranslated = false});
 
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
+    final String title;
+    final String hint;
+    if (query.isNotEmpty) {
+      title = 'No matches';
+      hint = 'Try a different search term.';
+    } else if (hiddenUntranslated) {
+      title = 'No translated cards';
+      hint = 'Turn on "Show untranslated" in filters, or translate them from Settings.';
+    } else {
+      title = 'No cards yet';
+      hint = 'Tap the mic below to dictate your first phrase.';
+    }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(width: 64, height: 64, decoration: BoxDecoration(color: theme.colors.surface2, shape: BoxShape.circle, border: Border.all(color: theme.colors.border)), child: Center(child: IconLayers(size: 28, color: theme.colors.inkFaint))),
           const SizedBox(height: 12),
-          Text(query.isNotEmpty ? 'No matches' : 'No cards yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.ink)),
+          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.ink)),
           const SizedBox(height: 4),
-          Text(query.isNotEmpty ? 'Try a different search term.' : 'Tap the mic below to dictate your first phrase.', style: TextStyle(fontSize: 13.5, color: theme.colors.inkSoft, height: 1.45), textAlign: TextAlign.center),
+          Text(hint, style: TextStyle(fontSize: 13.5, color: theme.colors.inkSoft, height: 1.45), textAlign: TextAlign.center),
         ],
       ),
     );

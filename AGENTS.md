@@ -16,7 +16,7 @@ lib/
 
   models/                       # Plain data classes with copyWith()
     card.dart                   # TranslationCard, TranslationEntry
-    settings.dart               # AppSettings, AccentOption, LanguageOption
+    settings.dart               # AppSettings, AccentOption, LanguageOption, languageOptions, languageNameFor()
     filter_state.dart           # FilterState (sort, filter, query, shuffledIds)
 
   services/                     # Platform & network abstractions
@@ -50,6 +50,11 @@ lib/
 
 test/
   widget_test.dart              # Placeholder smoke test
+  database_service_test.dart    # DB tombstone semantics + v2→v3 migration (sqflite_common_ffi)
+  card_widget_test.dart         # TranslationCardWidget untranslated + delete-translation states
+  filter_bar_test.dart          # Filter panel: PlayFAB clearance, scrolling, scroll position across collapse
+  card_repository_test.dart     # Backfill concurrency cap (16) + manual-translate loading state
+  cards_viewmodel_test.dart     # Atomic language switch (no intermediate layout)
 
 android/app/src/main/
   AndroidManifest.xml           # Permissions: RECORD_AUDIO, INTERNET, WAKE_LOCK
@@ -67,8 +72,9 @@ UI (widgets) → ViewModels (ChangeNotifier) → Repositories → Services (DB /
 
 - **ViewModels** are injected via `Provider` in `main.dart`. The `EchoLearnAppRoot` stateful widget initializes all services, repos, and view models, then wraps the app in `MultiProvider`.
 - **Data flow**: Cards are loaded from SQLite → cached in `CardRepository._cache` → broadcast via `StreamController` → `CardsViewModel` listens, sets `_cards`, calls `notifyListeners()` → `EchoLearnApp.build()` rebuilds via `context.watch<CardsViewModel>()`.
-- **Card translation pipeline**: Dictation creates a card → `CardRepository.processCard()` calls POST /translate → saves result → calls POST /tts → saves audio blob. Translation saves immediately; TTS failure leaves the card ready without audio.
-- **Language mapping**: Settings store `lang: 'jp'`. The DB uses the raw settings key as the language identifier. API calls convert via `_languageCode()` (`'jp'` → `'ja'`).
+- **Card translation pipeline**: Dictation creates a card → `CardRepository.processCard()` calls POST /translate → saves result → calls POST /tts → saves audio blob. Translation saves immediately; TTS failure leaves the card ready without audio. All processing goes through a FIFO pool capped at `_maxConcurrentProcesses = 16` cards (`CardRepository._pumpProcessQueue`), so at most 16 translate/TTS requests are in flight during back-fill; user-initiated work (single-card translate, audio repair) enqueues with `prioritize: true`.
+- **Language mapping**: Settings store `lang: 'jp'` / `'ko'` / `'zh'`. The DB uses the raw settings key as the language identifier. API calls convert via `_languageCode()` (`'jp'` → `'ja'`, `'ko'` → `'ko'`, `'zh'` → `'zh-Hans'`), matching the server's BCP-47 set (`lang-app-server/src/tts/index.ts` `LANGUAGES`).
+- **Multi-language & tombstones**: the settings switcher offers Japanese, Korean, and Mandarin Chinese. `translations.tombstone` (schema v3) marks a card as intentionally untranslated for a language. Switching language calls `CardRepository.changeLanguage()` → `tombstoneMissingTranslations()`, which inserts a tombstone row for every card missing that language, so the automatic back-fill (`_processPending`, driven by `TranslationCard.needsTranslation`) never generates them. Translation is opt-in: the settings `Translate N cards` button clears tombstones and triggers en-masse processing; the per-card Translate button clears one. Tombstoned cards are hidden by default (`FilterState.showUntranslated`) and skipped by auto-play. `TranslationCard.translationCount` (non-tombstone translations across all languages) gates the delete-translation button, which tombstones the current language without touching the card or other translations. Switching language is atomic: `CardsViewModel.changeLanguage()` buffers card-stream emissions and updates settings itself, then applies the new cards/settings in one notification, so the UI never renders a half-switched (new language + old cards) frame.
 - **Playback engine**: Token-based cancellation. `_playToken` increments to cancel in-flight operations. `_playStep()` drives sequential playback. Audio completion is detected via `AudioService.onComplete` stream. Shadow delay is computed from `delaySeconds` + optional clip duration.
 
 ## Development workflow
@@ -91,14 +97,14 @@ flutter test
 ```
 
 - **No code generation** — the project avoids build_runner. Models use manual `copyWith()` methods.
-- **DB migrations**: `DatabaseService` uses sqflite's `onCreate`/`onUpgrade`. Bump the version integer to trigger migrations. The v2 upgrade drops and recreates tables (destructive). **All future migrations must preserve existing data** — use `ALTER TABLE`, `CREATE TABLE IF NOT EXISTS`, and data-copy patterns in `onUpgrade`. Never drop tables unless explicitly approved.
+- **DB migrations**: `DatabaseService` uses sqflite's `onCreate`/`onUpgrade`. Bump the `version` integer (currently **3**) to trigger migrations. `onUpgrade` must preserve existing data — use `ALTER TABLE`, `CREATE TABLE IF NOT EXISTS`, and data-copy patterns (v3 added `translations.tombstone` via `ALTER TABLE`). Only `onDowngrade` drops tables. Never drop tables in `onUpgrade` unless explicitly approved.
 - **API key**: Set in Settings → persisted in DB → synced to `CardRepository._api.apiKey` on startup and settings change.
 
 ## Testing guidance
 
-- Tests live in `test/`. Currently only a placeholder exists.
+- Tests live in `test/` (DB/migrations, tombstones, backfill pool, card widget, filter bar, language switch); `widget_test.dart` is still a placeholder.
 - Use `flutter_test` for widget tests. ViewModels can be tested with `ChangeNotifier` listeners.
-- DB-dependent tests need `sqflite_common_ffi` for desktop testing or mock the `DatabaseService`.
+- DB-dependent tests use `sqflite_common_ffi` (dev dependency) — see `test/database_service_test.dart` — or mock the `DatabaseService`. Each DB test file must set `DatabaseService.overridePath` to a unique temp file, since test files run concurrently and would otherwise race on the same database.
 - When adding tests, follow: arrange (create VM with mock repo) → act (call VM method) → assert (check state via listener).
 
 ## Environment and configuration
@@ -126,15 +132,14 @@ flutter test
 ### Changing the database schema
 - Add columns/tables in `_createTables()` in `database_service.dart`
 - Bump the `version` integer in `openDatabase()`
-- Add migration logic in `onUpgrade` (or use destructive migration like v1→v2)
+- Add migration logic in `onUpgrade`, preserving data (see the v3 `tombstone` column addition)
 
 ### Call site of `TranslationCardWidget` — needs `card` + `translation` params
-When adding a card to the UI, always pass `card.translationFor(languageCode)` as the `translation:` parameter. The language code comes from `settingsVm.settings.lang` (raw settings key, e.g. `'jp'`).
+When adding a card to the UI, always pass `card.translationFor(languageCode)` as the `translation:` parameter and `languageNameFor(languageCode)` as `languageName:`. The language code comes from `settingsVm.settings.lang` (raw settings key, e.g. `'jp'`); never hardcode a language name in widgets — resolve it via `languageOptions` / `languageNameFor()` in `lib/models/settings.dart`.
 
 ## Safety notes
 
-- **DB migrations are destructive** between v1 and v2. Bumping the version will drop all data.
-- **The `onUpgrade` callback** in `database_service.dart` drops and recreates tables. Do not add incremental migrations without removing the `DROP TABLE` calls. All future migrations must preserve existing data — use `ALTER TABLE`, `CREATE TABLE IF NOT EXISTS`, and data-copy patterns.
+- **`onUpgrade` must be data-preserving**. Incremental migrations use `ALTER TABLE` / `CREATE TABLE IF NOT EXISTS` / data-copy patterns (v3 added `translations.tombstone`). Only `onDowngrade` drops tables. Never drop tables in `onUpgrade`.
 - **Audio playback uses token-based cancellation**. Always increment `_playToken` when stopping to prevent stale callbacks.
 - **PlayFAB reset logic**: `_pausedIndex` must be set before `_stopAllInternal()` (which clears `_currentId`). The public `_stopAll()` clears `_pausedIndex` — do not call it when pausing; use `_stopAllInternal()` instead.
 - **`virtual_list.dart`** is unused. The app uses `ListView.builder` with `ScrollController` and estimated offsets for `scrollToIndex`.

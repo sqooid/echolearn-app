@@ -7,6 +7,16 @@ import '../models/settings.dart';
 class DatabaseService {
   static Database? _db;
 
+  /// Absolute path override, used by tests to isolate their database from the
+  /// app's (and from other concurrently-running test files).
+  static String? overridePath;
+
+  static Future<String> _resolvePath() async {
+    final override = overridePath;
+    if (override != null) return override;
+    return join(await getDatabasesPath(), 'echolearn.db');
+  }
+
   static Future<Database> get database async {
     if (_db != null) return _db!;
     _db = await _initDb();
@@ -14,12 +24,11 @@ class DatabaseService {
   }
 
   static Future<Database> _initDb() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'echolearn.db');
+    final path = await _resolvePath();
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createTables(db);
       },
@@ -38,6 +47,9 @@ class DatabaseService {
           ''');
           try { await db.execute('ALTER TABLE cards ADD COLUMN plays INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
           try { await db.execute('ALTER TABLE cards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+        }
+        if (oldVersion < 3) {
+          try { await db.execute('ALTER TABLE translations ADD COLUMN tombstone INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
         }
       },
       onDowngrade: (db, oldVersion, newVersion) async {
@@ -67,6 +79,7 @@ class DatabaseService {
         text TEXT NOT NULL,
         audio_data BLOB,
         duration_ms INTEGER,
+        tombstone INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
       )
     ''');
@@ -128,6 +141,7 @@ class DatabaseService {
         'text': entry.text,
         'audio_data': entry.audioData,
         'duration_ms': entry.durationMs,
+        'tombstone': 0,
       });
     } else {
       await db.update(
@@ -136,11 +150,64 @@ class DatabaseService {
           'text': entry.text,
           'audio_data': entry.audioData,
           'duration_ms': entry.durationMs,
+          'tombstone': 0,
         },
         where: 'card_id = ? AND language = ?',
         whereArgs: [entry.cardId, entry.language],
       );
     }
+  }
+
+  static Future<void> setTombstone(int cardId, String language) async {
+    final db = await database;
+    await db.update(
+      'translations',
+      {'text': '', 'audio_data': null, 'duration_ms': null, 'tombstone': 1},
+      where: 'card_id = ? AND language = ?',
+      whereArgs: [cardId, language],
+    );
+  }
+
+  static Future<void> clearTombstone(int cardId, String language) async {
+    final db = await database;
+    await db.delete(
+      'translations',
+      where: 'card_id = ? AND language = ? AND tombstone = 1',
+      whereArgs: [cardId, language],
+    );
+  }
+
+  static Future<void> clearTombstones(String language) async {
+    final db = await database;
+    await db.delete(
+      'translations',
+      where: 'language = ? AND tombstone = 1',
+      whereArgs: [language],
+    );
+  }
+
+  static Future<void> tombstoneMissingTranslations(String language) async {
+    final db = await database;
+    final cardRows = await db.query('cards', columns: ['id']);
+    final existing = await db.query(
+      'translations',
+      columns: ['card_id'],
+      where: 'language = ?',
+      whereArgs: [language],
+    );
+    final present = existing.map((r) => r['card_id'] as int).toSet();
+    final batch = db.batch();
+    for (final row in cardRows) {
+      final cardId = row['id'] as int;
+      if (present.contains(cardId)) continue;
+      batch.insert('translations', {
+        'card_id': cardId,
+        'language': language,
+        'text': '',
+        'tombstone': 1,
+      });
+    }
+    await batch.commit(noResult: true);
   }
 
   static Future<void> deleteCard(int id) async {
@@ -153,7 +220,8 @@ class DatabaseService {
     final db = await database;
     final cardRows = await db.query('cards', orderBy: 'created_at DESC');
     final translations = await db.query('translations', where: 'language = ?', whereArgs: [language]);
-    return _buildCards(cardRows, translations);
+    final counts = await _translationCounts(db);
+    return _buildCards(cardRows, translations, counts);
   }
 
   static Future<TranslationCard?> getCardWithTranslation(int cardId, String language) async {
@@ -161,13 +229,30 @@ class DatabaseService {
     final cardRows = await db.query('cards', where: 'id = ?', whereArgs: [cardId]);
     if (cardRows.isEmpty) return null;
     final translations = await db.query('translations', where: 'card_id = ? AND language = ?', whereArgs: [cardId, language]);
-    return _buildCards(cardRows, translations).first;
+    final counts = await _translationCounts(db);
+    return _buildCards(cardRows, translations, counts).first;
   }
 
-  static List<TranslationCard> _buildCards(List<Map<String, dynamic>> cardRows, List<Map<String, dynamic>> translations) {
+  static Future<Map<int, int>> _translationCounts(Database db) async {
+    final rows = await db.rawQuery(
+      'SELECT card_id, COUNT(*) AS c FROM translations WHERE tombstone = 0 GROUP BY card_id',
+    );
+    return {for (final r in rows) r['card_id'] as int: r['c'] as int};
+  }
+
+  static List<TranslationCard> _buildCards(
+    List<Map<String, dynamic>> cardRows,
+    List<Map<String, dynamic>> translations,
+    Map<int, int> counts,
+  ) {
     final transByCard = <int, List<TranslationEntry>>{};
+    final tombstonedByCard = <int, List<String>>{};
     for (final t in translations) {
       final cardId = t['card_id'] as int;
+      if ((t['tombstone'] as int? ?? 0) == 1) {
+        tombstonedByCard.putIfAbsent(cardId, () => []).add(t['language'] as String);
+        continue;
+      }
       transByCard.putIfAbsent(cardId, () => []).add(TranslationEntry(
         id: t['id'] as int,
         cardId: cardId,
@@ -186,6 +271,8 @@ class DatabaseService {
         plays: row['plays'] as int,
         archived: (row['archived'] as int) == 1,
         translations: transByCard[id] ?? [],
+        tombstonedLanguages: tombstonedByCard[id] ?? [],
+        translationCount: counts[id] ?? 0,
       );
     }).toList();
   }
@@ -252,8 +339,7 @@ class DatabaseService {
 
   static Future<void> importBackup(String sourcePath) async {
     await close();
-    final dbPath = await getDatabasesPath();
-    final targetPath = join(dbPath, 'echolearn.db');
+    final targetPath = await _resolvePath();
     final source = File(sourcePath);
     await source.copy(targetPath);
   }

@@ -207,6 +207,8 @@ class _ActionBtnState extends State<ActionBtn> {
 class TranslationCardWidget extends StatelessWidget {
   final TranslationCard card;
   final TranslationEntry? translation;
+  final String languageName;
+  final bool untranslated;
   final bool expanded;
   final bool current;
   final bool playing;
@@ -216,11 +218,15 @@ class TranslationCardWidget extends StatelessWidget {
   final VoidCallback onArchive;
   final VoidCallback onDelete;
   final VoidCallback onRestore;
+  final VoidCallback onTranslate;
+  final VoidCallback onDeleteTranslation;
 
   const TranslationCardWidget({
     super.key,
     required this.card,
     required this.translation,
+    required this.languageName,
+    this.untranslated = false,
     required this.expanded,
     required this.current,
     required this.playing,
@@ -230,16 +236,18 @@ class TranslationCardWidget extends StatelessWidget {
     required this.onArchive,
     required this.onDelete,
     required this.onRestore,
+    required this.onTranslate,
+    required this.onDeleteTranslation,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
     final pad = 18.0 * theme.density;
-    final isTranslating = translation == null;
+    final isTranslating = translation == null && !untranslated;
 
     return GestureDetector(
-      onTap: isTranslating ? null : () => onToggle(),
+      onTap: (isTranslating || untranslated) ? null : () => onToggle(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: const Cubic(0.32, 0.72, 0, 1),
@@ -266,7 +274,11 @@ class TranslationCardWidget extends StatelessWidget {
           duration: const Duration(milliseconds: 250),
           curve: const Cubic(0.32, 0.72, 0, 1),
           alignment: Alignment.topCenter,
-          child: isTranslating ? _buildTranslating(theme) : _buildContent(theme),
+          child: isTranslating
+              ? _buildTranslating(theme)
+              : untranslated
+                  ? _buildUntranslated(theme)
+                  : _buildContent(theme),
         ),
       ),
     );
@@ -290,7 +302,7 @@ class TranslationCardWidget extends StatelessWidget {
             _Spinner(accent: theme.accent, borderStrong: theme.colors.borderStrong),
             const SizedBox(width: 8),
             Text(
-              'Translating to Japanese…',
+              'Translating to $languageName…',
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 11,
@@ -299,6 +311,39 @@ class TranslationCardWidget extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUntranslated(LingoTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          card.en,
+          style: TextStyle(
+            fontSize: 20,
+            height: 1.4,
+            fontWeight: FontWeight.w500,
+            color: theme.colors.ink,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Not translated',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            letterSpacing: 0.66,
+            color: theme.colors.inkFaint,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ActionBtn(
+          icon: IconType(size: 17, color: theme.colors.ink),
+          label: 'Translate',
+          onTap: onTranslate,
         ),
       ],
     );
@@ -399,6 +444,16 @@ class TranslationCardWidget extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            if (card.translationCount > 1) ...[
+              Tooltip(
+                message: 'Delete translation',
+                child: _IconBtn(
+                  icon: IconClose(size: 17, color: theme.colors.ink),
+                  onTap: onDeleteTranslation,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             Tooltip(
               message: 'Delete',
               child: _IconBtn(

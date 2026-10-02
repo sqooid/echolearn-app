@@ -3,6 +3,7 @@ class FilterState {
   final bool reshuffle;
   final String filter;
   final String query;
+  final bool showUntranslated;
   final List<int>? shuffledIds;
 
   const FilterState({
@@ -10,6 +11,7 @@ class FilterState {
     this.reshuffle = false,
     this.filter = 'active',
     this.query = '',
+    this.showUntranslated = false,
     this.shuffledIds,
   });
 
@@ -18,6 +20,7 @@ class FilterState {
     bool? reshuffle,
     String? filter,
     String? query,
+    bool? showUntranslated,
     List<int>? shuffledIds,
   }) {
     return FilterState(
@@ -25,6 +28,7 @@ class FilterState {
       reshuffle: reshuffle ?? this.reshuffle,
       filter: filter ?? this.filter,
       query: query ?? this.query,
+      showUntranslated: showUntranslated ?? this.showUntranslated,
       shuffledIds: shuffledIds ?? this.shuffledIds,
     );
   }

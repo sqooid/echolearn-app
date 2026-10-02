@@ -34,6 +34,8 @@ class CardsViewModel extends ChangeNotifier {
   int _playToken = 0;
   int? _pausedIndex;
   bool _pausedInDelay = false;
+  bool _bufferingCards = false;
+  List<TranslationCard>? _bufferedCards;
   StreamSubscription<List<TranslationCard>>? _sub;
 
   CardsViewModel({
@@ -42,6 +44,10 @@ class CardsViewModel extends ChangeNotifier {
     AudioService? audio,
   })  : _audio = audio ?? AudioService() {
     _sub = _repository.cards.listen((cards) {
+      if (_bufferingCards) {
+        _bufferedCards = cards;
+        return;
+      }
       _cards = cards;
       notifyListeners();
     });
@@ -50,6 +56,7 @@ class CardsViewModel extends ChangeNotifier {
   String get _lang => _settings.settings.lang;
 
   List<TranslationCard> get cards => _cards;
+  int get untranslatedCount => _cards.where((c) => c.isTombstoned(_lang)).length;
   CardRepository get repository => _repository;
   int? get expandedId => _expandedId;
   int? get speakingId => _speakingId;
@@ -66,6 +73,10 @@ class CardsViewModel extends ChangeNotifier {
       if (_fs.filter == 'archived') return c.archived;
       return !c.archived;
     }).toList();
+
+    if (!_fs.showUntranslated) {
+      v = v.where((c) => !c.isTombstoned(_lang)).toList();
+    }
 
     if (_fs.query.trim().isNotEmpty) {
       final q = _fs.query.trim().toLowerCase();
@@ -101,8 +112,42 @@ class CardsViewModel extends ChangeNotifier {
     _repository.processCard(card, _lang);
   }
 
+  Future<void> changeLanguage(String lang) async {
+    if (lang == _lang) return;
+    _stopAll();
+    // Hold the current layout until the new language's cards and settings are
+    // both ready, then surface them in a single notification.
+    _bufferingCards = true;
+    _bufferedCards = null;
+    try {
+      await _repository.changeLanguage(lang);
+      await _settings.update(_settings.settings.copyWith(lang: lang));
+    } finally {
+      _bufferingCards = false;
+    }
+    if (_bufferedCards != null) {
+      _cards = _bufferedCards!;
+      _bufferedCards = null;
+    }
+    notifyListeners();
+  }
+
+  void translateUntranslated() {
+    _repository.translateMissing(_lang);
+  }
+
+  void translateCard(TranslationCard card) {
+    _repository.translateCard(card, _lang);
+  }
+
+  void deleteTranslation(TranslationCard card) {
+    _expandedId = null;
+    _repository.deleteTranslation(card, _lang);
+    notifyListeners();
+  }
+
   void updateFilterState(FilterState fs) {
-    if (fs.sort != _fs.sort || fs.filter != _fs.filter) {
+    if (fs.sort != _fs.sort || fs.filter != _fs.filter || fs.showUntranslated != _fs.showUntranslated) {
       _pausedIndex = null;
     }
     _fs = fs;

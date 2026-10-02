@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/filter_state.dart';
 import '../utils/theme.dart';
 import 'icons.dart';
+import 'play_fab.dart';
+
+/// Vertical gap kept clear between the panel bottom and the PlayFAB.
+const double _fabClearance = 12;
 
 class SegmentedOption {
   final String id;
@@ -214,35 +218,44 @@ class _FilterBarState extends State<FilterBar> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  Widget _panel(LingoTheme theme, SortOptionDef cur, SegmentedOption filt) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: const Cubic(0.32, 0.72, 0, 1),
-      decoration: BoxDecoration(
-        color: theme.colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colors.border),
-        boxShadow: widget.open
-            ? const [BoxShadow(color: Color(0x40000000), blurRadius: 48, offset: Offset(0, 16)), BoxShadow(color: Color(0x20000000), blurRadius: 12, offset: Offset(0, 4))]
-            : const [BoxShadow(color: Color(0x2A000000), blurRadius: 24, offset: Offset(0, 6)), BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Header(
-              count: widget.count, curLabel: cur.label, reshuffle: widget.state.reshuffle,
-              filtLabel: filt.label, open: widget.open, onTap: () => widget.setOpen(!widget.open),
-            ),
-            SizeTransition(
-              sizeFactor: _expandAnimation,
-              child: _ExpandedContent(
-                state: widget.state, onChange: widget.onChange,
-                controller: _searchController, focusNode: _focusNode,
+  Widget _panel(LingoTheme theme, SortOptionDef cur, SegmentedOption filt, double maxHeight) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: const Cubic(0.32, 0.72, 0, 1),
+        decoration: BoxDecoration(
+          color: theme.colors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: theme.colors.border),
+          boxShadow: widget.open
+              ? const [BoxShadow(color: Color(0x40000000), blurRadius: 48, offset: Offset(0, 16)), BoxShadow(color: Color(0x20000000), blurRadius: 12, offset: Offset(0, 4))]
+              : const [BoxShadow(color: Color(0x2A000000), blurRadius: 24, offset: Offset(0, 6)), BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Header(
+                count: widget.count, curLabel: cur.label, reshuffle: widget.state.reshuffle,
+                filtLabel: filt.label, untranslated: widget.state.showUntranslated,
+                open: widget.open, onTap: () => widget.setOpen(!widget.open),
               ),
-            ),
-          ],
+              Flexible(
+                child: SizeTransition(
+                  sizeFactor: _expandAnimation,
+                  alignment: Alignment.topCenter,
+                  child: SingleChildScrollView(
+                    child: _ExpandedContent(
+                      state: widget.state, onChange: widget.onChange,
+                      controller: _searchController, focusNode: _focusNode,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -254,29 +267,31 @@ class _FilterBarState extends State<FilterBar> with SingleTickerProviderStateMix
     final cur = _sortOptions.firstWhere((s) => s.id == widget.state.sort);
     final filt = _filterOptions.firstWhere((f) => f.id == widget.state.filter);
 
-    if (widget.open) {
-      return Stack(
+    final top = 12 + MediaQuery.of(context).padding.top;
+    final fabTop = MediaQuery.of(context).size.height - kPlayFabBottom - kPlayFabDiameter;
+    final maxHeight = (fabTop - _fabClearance - top).clamp(0.0, double.infinity);
+
+    // Keep the widget tree structurally identical whether open or closed so the
+    // panel's scroll position survives minimise/expand. The backdrop is inert
+    // (IgnorePointer) while collapsed so taps reach the list and the header.
+    return Positioned.fill(
+      child: Stack(
         children: [
-          Positioned.fill(
+          IgnorePointer(
+            ignoring: !widget.open,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => widget.setOpen(false),
-              child: Container(color: Colors.transparent),
+              child: const SizedBox.expand(),
             ),
           ),
           Positioned(
-            top: 12 + MediaQuery.of(context).padding.top,
+            top: top,
             left: 16, right: 16,
-            child: _panel(theme, cur, filt),
+            child: _panel(theme, cur, filt, maxHeight),
           ),
         ],
-      );
-    }
-
-    return Positioned(
-      top: 12 + MediaQuery.of(context).padding.top,
-      left: 16, right: 16,
-      child: _panel(theme, cur, filt),
+      ),
     );
   }
 }
@@ -286,10 +301,11 @@ class _Header extends StatelessWidget {
   final String curLabel;
   final bool reshuffle;
   final String filtLabel;
+  final bool untranslated;
   final bool open;
   final VoidCallback onTap;
 
-  const _Header({required this.count, required this.curLabel, required this.reshuffle, required this.filtLabel, required this.open, required this.onTap});
+  const _Header({required this.count, required this.curLabel, required this.reshuffle, required this.filtLabel, required this.untranslated, required this.open, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +325,7 @@ class _Header extends StatelessWidget {
                 children: [
                   Text('$count ${count == 1 ? 'card' : 'cards'}', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: theme.colors.ink)),
                   const SizedBox(height: 1),
-                  Text('$curLabel${reshuffle ? ' · loops' : ''} · $filtLabel', style: TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: theme.colors.inkSoft), overflow: TextOverflow.ellipsis),
+                  Text('$curLabel${reshuffle ? ' · loops' : ''}${untranslated ? ' · untranslated' : ''} · $filtLabel', style: TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: theme.colors.inkSoft), overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -350,6 +366,8 @@ class _ExpandedContent extends StatelessWidget {
           )),
           const SizedBox(height: 14),
           _ReshuffleRow(reshuffle: state.reshuffle, onChange: (v) => onChange(state.copyWith(reshuffle: v))),
+          const SizedBox(height: 8),
+          _UntranslatedRow(show: state.showUntranslated, onChange: (v) => onChange(state.copyWith(showUntranslated: v))),
         ],
       ),
     );
@@ -403,26 +421,68 @@ class _ReshuffleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: theme.colors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colors.border)),
-      child: Row(
-        children: [
-          IconShuffle(size: 19, color: theme.colors.ink),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Reshuffle at end', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colors.ink)),
-                const SizedBox(height: 2),
-                Text('Re-order the list when playback reaches the bottom', style: TextStyle(fontSize: 12, height: 1.35, color: theme.colors.inkSoft)),
-              ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChange(!reshuffle),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: theme.colors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colors.border)),
+        child: Row(
+          children: [
+            IconShuffle(size: 19, color: theme.colors.ink),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Reshuffle at end', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colors.ink)),
+                  const SizedBox(height: 2),
+                  Text('Re-order the list when playback reaches the bottom', style: TextStyle(fontSize: 12, height: 1.35, color: theme.colors.inkSoft)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Toggle(on: reshuffle, onChange: onChange),
-        ],
+            const SizedBox(width: 12),
+            IgnorePointer(child: Toggle(on: reshuffle, onChange: onChange)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UntranslatedRow extends StatelessWidget {
+  final bool show;
+  final ValueChanged<bool> onChange;
+
+  const _UntranslatedRow({required this.show, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = LingoTheme.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChange(!show),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: theme.colors.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colors.border)),
+        child: Row(
+          children: [
+            IconGlobe(size: 19, color: theme.colors.ink),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Show untranslated', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colors.ink)),
+                  const SizedBox(height: 2),
+                  Text('Include cards without a translation in this language', style: TextStyle(fontSize: 12, height: 1.35, color: theme.colors.inkSoft)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            IgnorePointer(child: Toggle(on: show, onChange: onChange)),
+          ],
+        ),
       ),
     );
   }

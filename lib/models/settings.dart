@@ -18,14 +18,25 @@ class LanguageOption {
   final String id;
   final String name;
   final String native;
-  final bool enabled;
 
   const LanguageOption({
     required this.id,
     required this.name,
     required this.native,
-    required this.enabled,
   });
+}
+
+const languageOptions = [
+  LanguageOption(id: 'jp', name: 'Japanese', native: '日本語'),
+  LanguageOption(id: 'ko', name: 'Korean', native: '한국어'),
+  LanguageOption(id: 'zh', name: 'Chinese (Mandarin)', native: '中文'),
+];
+
+String languageNameFor(String id) {
+  for (final l in languageOptions) {
+    if (l.id == id) return l.name;
+  }
+  return id;
 }
 
 class SpacingOption {

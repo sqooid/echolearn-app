@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'models/card.dart';
+import 'models/settings.dart';
 import 'utils/theme.dart';
 import 'viewmodels/cards_viewmodel.dart';
 import 'viewmodels/settings_viewmodel.dart';
@@ -167,7 +168,10 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
                 children: [
                   if (_page == 'main') ...[
                     if (view.isEmpty)
-                      const EmptyState(query: '')
+                      EmptyState(
+                        query: cardsVm.filterState.query,
+                        hiddenUntranslated: cardsVm.cards.isNotEmpty && cardsVm.untranslatedCount > 0,
+                      )
                     else
                       ListView.builder(
                         controller: _scrollController,
@@ -180,13 +184,16 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
                         itemCount: view.length,
                         itemBuilder: (context, index) {
                           final card = view[index];
-                          final t = card.translationFor(settingsVm.settings.lang);
+                          final lang = settingsVm.settings.lang;
+                          final t = card.translationFor(lang);
                           return Padding(
                             padding: EdgeInsets.only(bottom: gap),
                             child: TranslationCardWidget(
                               key: ValueKey(card.id),
                               card: card,
                               translation: t,
+                              languageName: languageNameFor(lang),
+                              untranslated: card.isTombstoned(lang),
                               expanded: cardsVm.expandedId == card.id,
                               current: cardsVm.currentId == card.id && cardsVm.listPlaying,
                               playing: cardsVm.speakingId == card.id,
@@ -196,6 +203,8 @@ class _EchoLearnAppState extends State<EchoLearnApp> {
                               onArchive: () => cardsVm.archiveCard(card),
                               onDelete: () => _deleteCard(context, card, cardsVm, settingsVm),
                               onRestore: () => cardsVm.restoreCard(card),
+                              onTranslate: () => cardsVm.translateCard(card),
+                              onDeleteTranslation: () => cardsVm.deleteTranslation(card),
                             ),
                           );
                         },

@@ -13,7 +13,7 @@ import 'filter_bar.dart';
 const accentOptions = [
   AccentOption(
     id: 'mono',
-    name: 'Monochrome',
+    name: 'Mono',
     accent: '#3A3A3F',
     onAccent: '#FFFFFF',
     swatch: '#0E0E10',
@@ -41,13 +41,6 @@ const accentOptions = [
   ),
 ];
 
-const _languages = [
-  LanguageOption(id: 'jp', name: 'Japanese', native: '日本語', enabled: true),
-  LanguageOption(id: 'ko', name: 'Korean', native: '한국어', enabled: false),
-  LanguageOption(id: 'zh', name: 'Chinese', native: '中文', enabled: false),
-  LanguageOption(id: 'es', name: 'Spanish', native: 'Español', enabled: false),
-];
-
 const _spacingOptions = [
   SpacingOption(id: 'compact', label: 'Compact'),
   SpacingOption(id: 'cozy', label: 'Cozy'),
@@ -73,6 +66,7 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = LingoTheme.of(context);
+    final untranslatedCount = context.watch<CardsViewModel>().untranslatedCount;
     return Positioned.fill(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
@@ -95,24 +89,23 @@ class SettingsPage extends StatelessWidget {
             _Section(
               title: 'Translation language',
               child: Column(
-                children: _languages.map((l) {
-                  final active = settings.lang == l.id;
-                  return GestureDetector(
-                    onTap: l.enabled ? () => onChange(settings.copyWith(lang: l.id)) : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      curve: const Cubic(0.32, 0.72, 0, 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                      margin: const EdgeInsets.only(bottom: 2),
-                      decoration: BoxDecoration(
-                        color: active ? theme.colors.surface2 : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: active ? theme.colors.borderStrong : Colors.transparent,
+                children: [
+                  ...languageOptions.map((l) {
+                    final active = settings.lang == l.id;
+                    return GestureDetector(
+                      onTap: () => _selectLanguage(context, l.id),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        curve: const Cubic(0.32, 0.72, 0, 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: active ? theme.colors.surface2 : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: active ? theme.colors.borderStrong : Colors.transparent,
+                          ),
                         ),
-                      ),
-                      child: Opacity(
-                        opacity: l.enabled ? 1.0 : 0.45,
                         child: Row(
                           children: [
                             IconGlobe(
@@ -136,18 +129,6 @@ class SettingsPage extends StatelessWidget {
                                 color: theme.colors.inkSoft,
                               ),
                             ),
-                            if (!l.enabled) ...[
-                              const Spacer(),
-                              Text(
-                                'soon',
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                  letterSpacing: 0.5,
-                                  color: theme.colors.inkFaint,
-                                ),
-                              ),
-                            ],
                             if (active) ...[
                               const Spacer(),
                               IconCheck(size: 19, sw: 2.4, color: theme.accent),
@@ -155,9 +136,27 @@ class SettingsPage extends StatelessWidget {
                           ],
                         ),
                       ),
+                    );
+                  }),
+                  if (untranslatedCount > 0) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => context.read<CardsViewModel>().translateUntranslated(),
+                        icon: IconType(size: 18, color: theme.colors.ink),
+                        label: Text(
+                          'Translate $untranslatedCount ${untranslatedCount == 1 ? 'card' : 'cards'}',
+                          style: TextStyle(fontSize: 14, color: theme.colors.ink),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: theme.colors.borderStrong),
+                        ),
+                      ),
                     ),
-                  );
-                }).toList(),
+                  ],
+                ],
               ),
             ),
             _Section(
@@ -500,6 +499,11 @@ class SettingsPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _selectLanguage(BuildContext context, String lang) {
+    if (settings.lang == lang) return;
+    context.read<CardsViewModel>().changeLanguage(lang);
   }
 }
 

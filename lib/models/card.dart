@@ -41,6 +41,8 @@ class TranslationCard {
   final int plays;
   final bool archived;
   final List<TranslationEntry> translations;
+  final List<String> tombstonedLanguages;
+  final int translationCount;
   final bool isNew;
 
   const TranslationCard({
@@ -50,30 +52,22 @@ class TranslationCard {
     this.plays = 0,
     this.archived = false,
     this.translations = const [],
+    this.tombstonedLanguages = const [],
+    this.translationCount = 0,
     this.isNew = false,
   });
 
   TranslationEntry? translationFor(String language) {
-    try {
-      return translations.firstWhere((t) => t.language == language);
-    } catch (_) {
-      return null;
+    for (final t in translations) {
+      if (t.language == language) return t;
     }
+    return null;
   }
 
-  bool isPendingFor(String language) {
-    final t = translationFor(language);
-    return t == null || t.text.isEmpty;
-  }
+  bool isTombstoned(String language) => tombstonedLanguages.contains(language);
 
-  bool isReadyFor(String language) {
-    final t = translationFor(language);
-    return t != null && t.text.isNotEmpty && t.audioData != null;
-  }
-
-  String? get displayText => translations.isNotEmpty ? translations.first.text : null;
-  List<int>? get displayAudio => translations.isNotEmpty ? translations.first.audioData : null;
-  int? get displayDuration => translations.isNotEmpty ? translations.first.durationMs : null;
+  bool needsTranslation(String language) =>
+      translationFor(language) == null && !isTombstoned(language);
 
   TranslationCard copyWith({
     int? id,
@@ -82,6 +76,8 @@ class TranslationCard {
     int? plays,
     bool? archived,
     List<TranslationEntry>? translations,
+    List<String>? tombstonedLanguages,
+    int? translationCount,
     bool? isNew,
   }) {
     return TranslationCard(
@@ -91,6 +87,8 @@ class TranslationCard {
       plays: plays ?? this.plays,
       archived: archived ?? this.archived,
       translations: translations ?? this.translations,
+      tombstonedLanguages: tombstonedLanguages ?? this.tombstonedLanguages,
+      translationCount: translationCount ?? this.translationCount,
       isNew: isNew ?? this.isNew,
     );
   }
