@@ -17,7 +17,9 @@ A mobile language-learning app for dictation, translation, and spaced listening 
 
 ## Screenshots
 
-<!-- TODO: add screenshots -->
+| Cards | Record | Edit | Filters | Settings |
+|---|---|---|---|---|
+| ![Card list](docs/screenshots/main.jpg) | ![Dictation overlay](docs/screenshots/record.jpg) | ![Expanded card](docs/screenshots/edit.jpg) | ![Filter panel](docs/screenshots/filters.jpg) | ![Settings](docs/screenshots/settings.jpg) |
 
 ## Requirements
 
